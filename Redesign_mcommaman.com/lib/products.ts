@@ -117,6 +117,30 @@ export const PRODUCTS: Product[] = [
    fond calme — `pos` rattrape le cadrage quand le corps n'est pas au milieu.
    `piece` est l'article du catalogue proposé sous la photo : la pièce portée
    n'est jamais exactement celle-là, d'où le libellé « dans le même esprit ». */
+/** Les deux séquences du bandeau. `poster` est la première image affichée :
+    elle tient la place tant que la vidéo n'est pas chargée, et reste seule si
+    le mouvement réduit est demandé. */
+export const HERO_VIDEOS = [
+  {
+    src: "/videos/hero-1.mp4",
+    poster: "/images/hero/fille-cour.webp",
+    alt: "Enfants en tenues M comme Maman, filmés en boutique",
+    pos: "50% 40%",
+    tag: "Tous les jours",
+    piece: "p5",
+  },
+  {
+    src: "/videos/hero-2.mp4",
+    poster: "/images/hero/robe-rouge.webp",
+    alt: "Tenues de fête présentées en boutique",
+    pos: "50% 35%",
+    tag: "Les grands jours",
+    piece: "p8",
+  },
+] as const;
+
+/** Les photos d'origine du bandeau. Le site sert désormais les vidéos
+    ci-dessus ; elles restent la référence du back-office. */
 export const HERO_SLIDES = [
   {
     src: "/images/hero/fille-cour.webp",
