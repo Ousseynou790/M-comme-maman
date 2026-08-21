@@ -173,6 +173,25 @@ export function IconSmile({ className }: Props) {
   );
 }
 
+export function IconMail({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <rect x="2.8" y="5.4" width="18.4" height="13.2" rx="2.6" />
+      <path d="m3.6 7.2 7.2 5.3a2 2 0 0 0 2.4 0l7.2-5.3" />
+    </Svg>
+  );
+}
+
+/** Guillemets ouvrants, posés en médaillon au-dessus d'un avis. */
+export function IconQuote({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
+      <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
+    </Svg>
+  );
+}
+
 /** WhatsApp : logo plein, pas au trait — il doit rester reconnaissable. */
 export function IconWhatsApp({ className = base }: Props) {
   return (

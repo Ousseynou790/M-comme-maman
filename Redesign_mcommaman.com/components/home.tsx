@@ -14,7 +14,17 @@ import {
 } from "./motion";
 import { Hero } from "./hero";
 import { ProductCard } from "./product-card";
-import { IconArrow, IconArrowUp, IconLeaf, IconRuler, IconShield, IconSmile } from "./icons";
+import {
+  IconArrow,
+  IconArrowUp,
+  IconLeaf,
+  IconMail,
+  IconQuote,
+  IconRuler,
+  IconShield,
+  IconSmile,
+  IconWhatsApp,
+} from "./icons";
 import { QuickView } from "./quick-view";
 import { Countdown } from "./countdown";
 import { waLink } from "@/lib/format";
@@ -153,12 +163,67 @@ const PROMESSES = [
   { Icone: IconSmile, t: "Choisis avec amour", s: "Chaque pièce est sélectionnée par notre équipe de mamans." },
 ];
 
+/* Le mot des mamans, repris de la maquette boty : trois avis choisis parmi
+   ceux de la boutique, la note et la référence de commande qui les rend
+   vérifiables. Avis fictifs en attendant qu'ils remontent du back-office. */
 const REVIEWS = [
-  { stars: 5, ini: "AF", who: "Aminata F.", what: "Ensemble pyjama à illustration", text: "Commandé le matin, livré le lendemain à Sacré-Cœur. La taille correspond bien à l'âge, le tissu ne gratte pas." },
-  { stars: 5, ini: "BS", who: "Bineta S.", what: "Robe de fête écrue", text: "La jupe en plumetis fait vraiment son effet. Ma fille l'a portée pour la Tabaski, tout le monde a demandé où je l'avais trouvée." },
-  { stars: 4, ini: "KB", who: "Khady B.", what: "Babies vernies à bride", text: "Très jolies et solides. J'aurais aimé une pointure de plus en stock, la vendeuse m'a prévenue du réassort par WhatsApp." },
-  { stars: 5, ini: "MD", who: "Mariama D.", what: "Jean droit en denim", text: "La taille réglable à l'intérieur change tout pour un enfant de 12 ans qui pousse. Denim épais, coutures nettes." },
-  { stars: 5, ini: "SN", who: "Sokhna N.", what: "Robe d'été fleurie", text: "Le bloomer assorti est une bonne idée pour les petites. Reçue en une journée aux Almadies, emballage soigné." },
+  {
+    stars: 5,
+    who: "Aminata Fall",
+    ref: "CMD-2418",
+    text: "Commandé le matin, livré le lendemain à Sacré-Cœur. La taille correspond vraiment à l'âge et le tissu ne gratte pas : mon fils l'a gardé toute la journée.",
+  },
+  {
+    stars: 5,
+    who: "Bineta Sarr",
+    ref: "CMD-2402",
+    text: "La robe en plumetis fait son effet. Ma fille l'a portée pour la Tabaski, tout le monde a demandé où je l'avais trouvée.",
+  },
+  {
+    stars: 4,
+    who: "Khady Ba",
+    ref: "CMD-2391",
+    text: "Babies très jolies et solides. Ma pointure manquait, mais on m'a prévenue du réassort sur WhatsApp et je l'ai eue trois jours après.",
+  },
+];
+
+/* Les étoiles restent des glyphes : le projet n'embarque aucune bibliothèque
+   d'icônes tierce, et un ★ garde la même graisse partout. */
+function Etoiles({ note }: { note: number }) {
+  const pleines = Math.round(note);
+  return (
+    <span
+      role="img"
+      aria-label={`Noté ${String(note).replace(".", ",")} sur 5`}
+      className="shrink-0 text-[15px] leading-none tracking-[2px] text-gold"
+    >
+      {"★".repeat(pleines)}
+      <span className="text-gold/25">{"★".repeat(5 - pleines)}</span>
+    </span>
+  );
+}
+
+/* Les deux façons d'atteindre la boutique. Le numéro est celui de `WHATSAPP`,
+   écrit ici en clair parce qu'il s'affiche autant qu'il sert de lien. */
+const CONTACT = [
+  {
+    canal: "WhatsApp",
+    valeur: "+221 76 208 02 02",
+    delai: "Réponse dans la journée",
+    href: waLink("Bonjour, j'ai une question"),
+    externe: true,
+    Icone: IconWhatsApp,
+    pastille: "bg-rose text-white",
+  },
+  {
+    canal: "Courriel",
+    valeur: "mamand202122@gmail.com",
+    delai: "Réponse sous 24 h",
+    href: "mailto:mamand202122@gmail.com",
+    externe: false,
+    Icone: IconMail,
+    pastille: "bg-gold text-ink",
+  },
 ];
 
 /* Le mot qui traverse la bande promo, en très grand et presque effacé. Assez
@@ -535,60 +600,62 @@ export function Home() {
       </section>
 
       {/* ============================================================= avis */}
-      <section className="pt-16 md:pt-20">
-        <Reveal className={`${SHELL} mb-7 flex flex-wrap items-end justify-between gap-3`}>
-          <div>
-            <span className={EYEBROW}>Elles ont commandé</span>
-            <h2 className={`${H2} mt-2.5`}>
-              <CountUp to={126} /> mamans, et le bouche-à-oreille
-            </h2>
-          </div>
-          <span className="text-sm font-semibold text-muted">Avis modérés avant publication</span>
+      <section className={`${SHELL} pt-16 md:pt-20`}>
+        <Reveal className="mb-7 text-center">
+          <span className={EYEBROW}>Elles nous font confiance</span>
+          <h2 className={`${H2} mt-2.5 text-balance`}>Le mot des mamans</h2>
+          <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-muted">
+            <Etoiles note={4.9} />
+            4,9/5 sur <CountUp to={126} /> avis
+          </p>
         </Reveal>
 
-        {/* Deux rangs qui se croisent : la page respire, la lecture reste libre
-            puisque le survol met le défilement en pause. */}
-        <Reveal className="flex flex-col gap-4 overflow-hidden">
-          {[0, 1].map((row) => (
-            <div key={row} className="marquee-hold overflow-hidden">
-              <div
-                className={`marquee ${row === 1 ? "marquee-rev" : ""}`}
-                style={{ "--dur": `${row === 0 ? 58 : 68}s` } as React.CSSProperties}
-              >
-                {[0, 1].map((pass) => (
-                  <div key={pass} className="flex shrink-0 gap-4 pr-4" aria-hidden={pass === 1}>
-                    {(row === 0 ? REVIEWS : [...REVIEWS].reverse()).map((r) => (
-                      <article
-                        key={r.ini}
-                        className="w-[300px] shrink-0 rounded-[22px] bg-mist p-6 sm:w-[380px]"
-                      >
-                        <div className="text-[15px] tracking-[2px] text-gold">
-                          {"★".repeat(r.stars)}
-                          <span className="text-gold/30">{"★".repeat(5 - r.stars)}</span>
-                        </div>
-                        <p className="mt-3.5 text-[14.5px] leading-[1.65] text-[#3d2f35]">{r.text}</p>
-                        <div className="mt-5 flex items-center gap-2.5">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose text-[12.5px] font-bold text-white">
-                            {r.ini}
-                          </span>
-                          <div>
-                            <div className="text-[13px] font-bold">{r.who}</div>
-                            <div className="text-xs text-muted">{r.what}</div>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ))}
+        {/* Trois cartes de même hauteur : le médaillon et la note en tête, la
+            citation au milieu, la cliente en pied derrière un filet. Sous
+            `sm`, elles s'empilent — un avis coupé ne se lit pas. */}
+        <Reveal className="grid grid-cols-1 gap-4 sm:grid-cols-3" stagger={90}>
+          {REVIEWS.map((r) => (
+            <article
+              key={r.ref}
+              className="flex min-h-[210px] flex-col rounded-[22px] bg-mist p-6 transition-transform duration-400 ease-soft hover:-translate-y-1"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-soft">
+                  <IconQuote className="h-4 w-4 text-rose" />
+                </span>
+                <Etoiles note={r.stars} />
               </div>
-            </div>
+
+              <p className="flex-1 text-[14.5px] leading-[1.65] text-[#3d2f35] text-pretty">
+                «&nbsp;{r.text}&nbsp;»
+              </p>
+
+              <div className="mt-5 border-t border-line pt-3.5">
+                <div className="text-[13px] font-bold">{r.who}</div>
+                <div className="mt-0.5 text-xs text-muted">Cliente vérifiée · {r.ref}</div>
+              </div>
+            </article>
           ))}
         </Reveal>
+
+        {/* Pas de page « tous les avis » ici : le dépôt passe par WhatsApp,
+            comme le reste de la relation client. */}
+        <div className="mt-7 text-center">
+          <a
+            href={waLink("Bonjour, j'ai reçu ma commande et je voudrais laisser un avis")}
+            target="_blank"
+            rel="noreferrer"
+            className="group inline-flex items-center gap-2 rounded-full border-[1.5px] border-[#e5d9de] bg-white px-6 py-3.5 text-sm font-semibold transition-colors duration-300 hover:border-rose hover:text-rose"
+          >
+            Donner mon avis
+            <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
+          </a>
+        </div>
       </section>
 
-      {/* ===================================================== appel final */}
+      {/* ================================================== nous contacter */}
       <Reveal className={`${SHELL} pt-16 md:pt-20`} variant="scale">
-        <div className="noise relative overflow-hidden rounded-[26px] bg-ink px-6 py-16 text-center text-white md:rounded-[34px] md:py-24">
+        <div className="noise relative overflow-hidden rounded-[26px] bg-ink px-6 py-16 text-center text-white md:rounded-[34px] md:py-20">
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="aurora absolute -left-20 top-0 h-80 w-80 rounded-full bg-rose/40 blur-[90px]" />
             <div className="aurora absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-gold/30 blur-[90px] [animation-delay:-11s]" />
@@ -596,35 +663,45 @@ export function Home() {
 
           <div className="relative">
             <span className="text-[11px] font-bold uppercase tracking-[.16em] text-gold">
-              Prête à commander ?
+              Une question ?
             </span>
             <h2 className="mx-auto mt-4 max-w-[16ch] text-[clamp(2.1rem,6vw,3.4rem)] font-extrabold leading-[1.04] tracking-[-.038em] text-balance">
-              La bonne taille, livrée demain.
+              Nous contacter
             </h2>
             <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-white/70 text-pretty">
-              Un doute sur une pointure ou une couleur ? Écrivez, on répond dans la journée et on
-              garde la pièce de côté.
+              Une taille, une commande en cours, une pièce que vous cherchez : écrivez sur WhatsApp
+              ou par courriel, une vraie personne répond.
             </p>
-            <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-              <Magnetic>
-                <Link
-                  href="/boutique"
-                  className="shine block rounded-full bg-rose px-8 py-4 text-center text-[14.5px] font-semibold text-white shadow-[0_16px_38px_-16px_rgba(224,65,127,.9)]"
-                >
-                  Voir les {PRODUCTS.length} pièces
-                </Link>
-              </Magnetic>
-              <Magnetic strength={7}>
+
+            {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
+                où la cliente a déjà l'habitude d'écrire. */}
+            <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">
+              {CONTACT.map((c) => (
                 <a
-                  href={waLink("Bonjour, je voudrais des conseils de taille")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block rounded-full border border-white/25 px-8 py-4 text-center text-[14.5px] font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-ink"
+                  key={c.canal}
+                  href={c.href}
+                  {...(c.externe ? { target: "_blank", rel: "noreferrer" } : null)}
+                  className="flex items-center gap-4 rounded-[22px] border border-white/15 bg-white/5 p-5 text-left transition-all duration-400 ease-soft hover:-translate-y-1 hover:border-white/35 hover:bg-white/10"
                 >
-                  Écrire sur WhatsApp
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.pastille}`}
+                  >
+                    <c.Icone className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-white/50">
+                      {c.canal}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[14.5px] font-semibold">{c.valeur}</span>
+                    <span className="block text-xs text-white/50">{c.delai}</span>
+                  </span>
                 </a>
-              </Magnetic>
+              ))}
             </div>
+
+            <p className="mt-6 text-[13px] text-white/50">
+              Lundi au samedi, 9 h – 19 h · Dakar, Sénégal
+            </p>
           </div>
         </div>
       </Reveal>
