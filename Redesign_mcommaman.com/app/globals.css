@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-rose: #e0417f;
+  --color-rose-deep: #b3306a;
+  --color-rose-soft: #fbeaf1;
+  --color-ink: #241a20;
+  /* Quatre valeurs d'un même rose très dilué, du plus clair au plus soutenu :
+     `cream` pour ce qui doit ressortir (cartes, en-tête), `blush` pour le sol
+     de la page, `mist` et `stone` pour les blocs posés dessus. Le fond du site
+     est ainsi de la même famille que le bandeau d'accueil, en plus calme. */
+  --color-cream: #fffdfe;
+  --color-blush: #fdf4f8;
+  --color-mist: #f9ecf2;
+  --color-stone: #f6e9f0;
+  --color-line: #f2e0e9;
+  --color-muted: #7a6b72;
+  --color-gold: #f0c24a;
+  --color-gold-soft: #fdf3dc;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Une seule courbe pour tout le site : les mouvements se ressemblent. */
+  --ease-soft: cubic-bezier(0.22, 0.68, 0.16, 1);
+  --ease-back: cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--color-blush);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: #fbdce8; }
+
+/* ---------------------------------------------------------------- keyframes */
+
+@keyframes rise { from { opacity: 0; transform: translateY(26px) } to { opacity: 1; transform: none } }
+@keyframes hero { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+@keyframes zoom { from { transform: scale(1.1) } to { transform: scale(1) } }
+@keyframes pop { 0% { transform: scale(1) } 42% { transform: scale(1.55) } 100% { transform: scale(1) } }
+@keyframes tick { from { opacity: .35; transform: translateY(-5px) } to { opacity: 1; transform: none } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(28px) } to { opacity: 1; transform: none } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px) scale(.97) } to { opacity: 1; transform: none } }
+
+/* Révélations — une variante par direction, même courbe. */
+@keyframes rise-blur { from { opacity: 0; transform: translateY(30px); filter: blur(10px) } to { opacity: 1; transform: none; filter: blur(0) } }
+@keyframes rise-scale { from { opacity: 0; transform: translateY(22px) scale(.94) } to { opacity: 1; transform: none } }
+@keyframes rise-left { from { opacity: 0; transform: translateX(-34px) } to { opacity: 1; transform: none } }
+@keyframes rise-right { from { opacity: 0; transform: translateX(34px) } to { opacity: 1; transform: none } }
+
+/* Titre mot à mot : le mot monte derrière un masque. */
+@keyframes word { from { opacity: 0; transform: translateY(105%) rotate(4deg) } to { opacity: 1; transform: none } }
+
+/* Ambiance du hero. */
+@keyframes aurora {
+  0%   { transform: translate3d(0,0,0) scale(1) }
+  33%  { transform: translate3d(6%, -5%, 0) scale(1.12) }
+  66%  { transform: translate3d(-5%, 4%, 0) scale(.95) }
+  100% { transform: translate3d(0,0,0) scale(1) }
+}
+@keyframes cue { 0% { transform: translateY(-6px); opacity: 0 } 45% { opacity: 1 } 100% { transform: translateY(12px); opacity: 0 } }
+
+/* Bandeau défilant. Le contenu est dupliqué, on translate de la moitié. */
+@keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+
+/* Éclat qui traverse un bouton ou une carte sombre. */
+@keyframes shine { from { transform: translateX(-120%) skewX(-18deg) } to { transform: translateX(320%) skewX(-18deg) } }
+
+
+/* Bandeau qui remonte : même piste, sens inverse. */
+@keyframes marquee-rev { from { transform: translateX(-50%) } to { transform: translateX(0) } }
+
+/* Travelling très lent sur la photo du hero. */
+@keyframes ken { from { transform: scale(1.08) translate3d(0, 0, 0) } to { transform: scale(1.19) translate3d(-2%, -2%, 0) } }
+
+/* Onde autour d'un point cliquable posé sur une photo. */
+@keyframes ring { 0% { transform: scale(.55); opacity: .85 } 100% { transform: scale(2.6); opacity: 0 } }
+
+/* Colonnes de pièces qui dérivent en fond de hero. La piste est doublée :
+   translater de la moitié ramène exactement au point de départ. */
+@keyframes drift-up { from { transform: translateY(0) } to { transform: translateY(-50%) } }
+@keyframes drift-down { from { transform: translateY(-50%) } to { transform: translateY(0) } }
+
+/* Visuel latéral qui se substitue au précédent. */
+@keyframes panel { from { opacity: 0; transform: scale(1.05) } to { opacity: 1; transform: none } }
+
+/* Éventail de rayons du sélecteur d'univers. */
+@keyframes turn { to { rotate: 360deg } }
+
+
+/* Bandeau d'accueil — l'arche monte, le trait se dessine, la barre se remplit. */
+@keyframes arch { from { opacity: 0; transform: translateY(38px) scale(.96) } }
+@keyframes draw { from { stroke-dashoffset: var(--len, 320) } }
+@keyframes fill { from { transform: scaleX(0) } }
+
+/* Recherche : le voile s'assombrit, le panneau se pose. */
+@keyframes veil { from { opacity: 0 } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-12px) scale(.97) } }
+
+/* ---------------------------------------------------------------- utilitaires */
+
+.anim-hero { animation: hero .7s var(--ease-soft) backwards; }
+.anim-zoom { animation: zoom 1.4s var(--ease-soft) backwards; }
+.anim-float { animation: float 6s 1.2s ease-in-out infinite; }
+.anim-pop { animation: pop .4s var(--ease-soft); }
+.anim-tick { animation: tick .45s var(--ease-soft); }
+.anim-slide-in { animation: slide-in .24s var(--ease-soft); }
+.anim-fade-up { animation: fade-up .26s var(--ease-soft); }
+.anim-cue { animation: cue 1.8s ease-in-out infinite; }
+
+/* Reveal : état de repos + une classe par variante.
+   `backwards` et non `both` : une animation remplie vers l'avant garderait
+   `transform: none` en priorité et neutraliserait les survols des cartes. */
+.reveal { opacity: 0; }
+.reveal-up { animation: rise .75s var(--ease-soft) backwards; }
+.reveal-blur { animation: rise-blur .9s var(--ease-soft) backwards; }
+.reveal-scale { animation: rise-scale .8s var(--ease-soft) backwards; }
+.reveal-left { animation: rise-left .8s var(--ease-soft) backwards; }
+.reveal-right { animation: rise-right .8s var(--ease-soft) backwards; }
+
+/* Cascade : les enfants directs héritent d'un décalage croissant. */
+.stagger > * { animation: rise .7s var(--ease-soft) backwards; }
+.stagger > *:nth-child(1) { animation-delay: calc(var(--step, 90ms) * 0) }
+.stagger > *:nth-child(2) { animation-delay: calc(var(--step, 90ms) * 1) }
+.stagger > *:nth-child(3) { animation-delay: calc(var(--step, 90ms) * 2) }
+.stagger > *:nth-child(4) { animation-delay: calc(var(--step, 90ms) * 3) }
+.stagger > *:nth-child(5) { animation-delay: calc(var(--step, 90ms) * 4) }
+.stagger > *:nth-child(6) { animation-delay: calc(var(--step, 90ms) * 5) }
+.stagger > *:nth-child(n+7) { animation-delay: calc(var(--step, 90ms) * 6) }
+
+/* Titre mot à mot. */
+.word-mask { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .08em; }
+.word-mask > span { display: inline-block; animation: word .8s var(--ease-soft) backwards; }
+
+/* Halo d'ambiance du hero. */
+.aurora { animation: aurora 22s ease-in-out infinite; will-change: transform; }
+
+/* Bandeau défilant : la piste double, la moitié suffit à boucler. */
+.marquee { display: flex; width: max-content; animation: marquee var(--dur, 34s) linear infinite; }
+.marquee-rev { animation-name: marquee-rev; }
+.marquee-hold:hover .marquee { animation-play-state: paused; }
+
+.anim-ken { animation: ken 18s ease-out both; }
+.anim-panel { animation: panel .7s var(--ease-soft) backwards; }
+.anim-drift-up { animation: drift-up var(--dur, 60s) linear infinite; }
+.anim-drift-down { animation: drift-down var(--dur, 60s) linear infinite; }
+
+/* Éventail de rayons : le masque éteint les bords, la rotation est si lente
+   qu'on ne la voit pas bouger — elle empêche seulement l'image de figer. */
+.rays {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(36, 26, 32, .05) 0deg 1.3deg,
+    transparent 1.3deg 7deg
+  );
+  -webkit-mask-image: radial-gradient(closest-side, #000 12%, transparent 74%);
+  mask-image: radial-gradient(closest-side, #000 12%, transparent 74%);
+  animation: turn 150s linear infinite;
+}
+
+/* Point cliquable posé sur une photo : le noyau, puis l'onde. */
+.hotspot::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, .55);
+  animation: ring 2.4s ease-out infinite;
+}
+
+/* Rail horizontal : on cache la barre, le doigt et la souris suffisent. */
+.rail {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail > * { flex: none; }
+.rail > * > * { scroll-snap-align: start; }
+.rail.dragging { cursor: grabbing; scroll-snap-type: none; }
+.rail.dragging * { pointer-events: none; }
+
+/* En boucle, l'aimantation se battrait avec le défilement automatique. */
+.rail-auto { scroll-snap-type: none; }
+
+/* Étiquette qui suit le curseur au-dessus d'un visuel. Toujours montée, pour
+   qu'elle soit déjà à la bonne place quand elle s'ouvre. */
+.cursor-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+/* Reflet au survol — sur un conteneur en `relative overflow-hidden`. */
+.shine { position: relative; overflow: hidden; }
+.shine::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+}
+.shine:hover::after { animation: shine .85s var(--ease-soft); }
+
+/* Lueur qui suit le curseur. --mx / --my sont posés en JS. */
+.spot { position: relative; }
+.spot::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity .35s var(--ease-soft);
+  background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(224,65,127,.13), transparent 62%);
+  pointer-events: none;
+}
+.spot:hover::before { opacity: 1; }
+
+/* Inclinaison 3D légère — --rx / --ry posés en JS. */
+.tilt {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+  transition: transform .5s var(--ease-soft);
+}
+
+/* Grain discret sur les aplats sombres. */
+.noise::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  opacity: .5;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+}
+
+/* Barre de progression de lecture, posée par le header. */
+.progress { transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
+
+/* --------------------------------------------------------- bandeau d'accueil */
+
+/* Deux lavis très larges sur l'ivoire : rose en haut à droite, doré en bas à
+   gauche. Le bandeau se distingue du reste de la page sans changer de fond. */
+.hero-canvas {
+  background:
+    radial-gradient(1150px 640px at 78% 6%, #fdeef4 0%, transparent 62%),
+    radial-gradient(920px 540px at 4% 96%, #fdf5e4 0%, transparent 64%),
+    var(--color-blush);
+}
+
+/* Trame de points, éteinte sur les bords par un masque : elle donne du grain à
+   l'aplat sans jamais venir devant le texte. */
+.hero-dots {
+  background-image: radial-gradient(rgba(36, 26, 32, .14) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(closest-side at 26% 34%, #000 0%, transparent 76%);
+  mask-image: radial-gradient(closest-side at 26% 34%, #000 0%, transparent 76%);
+  opacity: .5;
+}
+
+.anim-arch { animation: arch 1.1s .15s var(--ease-soft) backwards; }
+
+/* Le trait sous le mot d'accent. Au repos l'offset vaut 0 : l'animation part de
+   la longueur du tracé et revient à cet état — pas besoin de `forwards`, qui
+   fige la propriété et gêne tout survol posé au-dessus. */
+.anim-draw {
+  stroke-dasharray: var(--len, 320);
+  stroke-dashoffset: 0;
+  animation: draw 1.05s 1.05s var(--ease-soft) backwards;
+}
+
+/* Barre de la photo en cours. La durée n'est pas écrite ici : elle est posée en
+   ligne depuis le composant, qui la partage avec son minuteur — une seule
+   valeur pour le défilement et pour ce qu'on en voit. */
+.hero-fill {
+  transform-origin: 0 50%;
+  animation-name: fill;
+  animation-timing-function: linear;
+  animation-fill-mode: backwards;
+}
+
+/* Le sceau tourne assez lentement pour qu'on ne le lise pas au vol : il donne
+   une impression d'atelier, pas une information. */
+.anim-seal { animation: turn 26s linear infinite; }
+
+.anim-veil { animation: veil .25s var(--ease-soft); }
+.anim-pop-in { animation: pop-in .3s var(--ease-soft) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .reveal, .stagger > * { opacity: 1; transform: none; filter: none; }
+  .tilt { transform: none; }
+  .anim-ken { animation: none; transform: none; }
+  .rail { scroll-behavior: auto; }
+}
