@@ -19,10 +19,12 @@ import {
   IconArrow,
   IconArrowUp,
   IconLeaf,
+  IconMail,
   IconQuote,
   IconRuler,
   IconShield,
   IconSmile,
+  IconWhatsApp,
 } from "./icons";
 import { QuickView } from "./quick-view";
 import { Countdown } from "./countdown";
@@ -171,6 +173,29 @@ function Etoiles({ note }: { note: number }) {
     </span>
   );
 }
+
+/* Les deux façons d'atteindre la boutique. Le numéro est celui de `WHATSAPP`,
+   écrit ici en clair parce qu'il s'affiche autant qu'il sert de lien. */
+const CONTACT = [
+  {
+    canal: "WhatsApp",
+    valeur: "+221 76 208 02 02",
+    delai: "Réponse dans la journée",
+    href: waLink("Bonjour, j'ai une question"),
+    externe: true,
+    Icone: IconWhatsApp,
+    pastille: "bg-rose text-white",
+  },
+  {
+    canal: "Courriel",
+    valeur: "mamand202122@gmail.com",
+    delai: "Réponse sous 24 h",
+    href: "mailto:mamand202122@gmail.com",
+    externe: false,
+    Icone: IconMail,
+    pastille: "bg-gold text-ink",
+  },
+];
 
 /* Le mot qui traverse la bande promo, en très grand et presque effacé. Assez
    d'entrées pour qu'une passe dépasse la largeur de l'écran : la piste est
@@ -624,9 +649,9 @@ export function Home() {
         </div>
       </section>
 
-      {/* ===================================================== appel final */}
+      {/* ================================================== nous contacter */}
       <Reveal className={`${SHELL} pt-16 md:pt-20`} variant="scale">
-        <div className="noise relative overflow-hidden rounded-[26px] bg-ink px-6 py-16 text-center text-white md:rounded-[34px] md:py-24">
+        <div className="noise relative overflow-hidden rounded-[26px] bg-ink px-6 py-16 text-center text-white md:rounded-[34px] md:py-20">
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="aurora absolute -left-20 top-0 h-80 w-80 rounded-full bg-rose/40 blur-[90px]" />
             <div className="aurora absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-gold/30 blur-[90px] [animation-delay:-11s]" />
@@ -634,35 +659,45 @@ export function Home() {
 
           <div className="relative">
             <span className="text-[11px] font-bold uppercase tracking-[.16em] text-gold">
-              Prête à commander ?
+              Une question ?
             </span>
             <h2 className="mx-auto mt-4 max-w-[16ch] text-[clamp(2.1rem,6vw,3.4rem)] font-extrabold leading-[1.04] tracking-[-.038em] text-balance">
-              La bonne taille, livrée demain.
+              Nous contacter
             </h2>
             <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-white/70 text-pretty">
-              Un doute sur une pointure ou une couleur ? Écrivez, on répond dans la journée et on
-              garde la pièce de côté.
+              Une taille, une commande en cours, une pièce que vous cherchez : écrivez sur WhatsApp
+              ou par courriel, une vraie personne répond.
             </p>
-            <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-              <Magnetic>
-                <Link
-                  href="/boutique"
-                  className="shine block rounded-full bg-rose px-8 py-4 text-center text-[14.5px] font-semibold text-white shadow-[0_16px_38px_-16px_rgba(224,65,127,.9)]"
-                >
-                  Voir les {PRODUCTS.length} pièces
-                </Link>
-              </Magnetic>
-              <Magnetic strength={7}>
+
+            {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
+                où la cliente a déjà l'habitude d'écrire. */}
+            <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">
+              {CONTACT.map((c) => (
                 <a
-                  href={waLink("Bonjour, je voudrais des conseils de taille")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block rounded-full border border-white/25 px-8 py-4 text-center text-[14.5px] font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-ink"
+                  key={c.canal}
+                  href={c.href}
+                  {...(c.externe ? { target: "_blank", rel: "noreferrer" } : null)}
+                  className="flex items-center gap-4 rounded-[22px] border border-white/15 bg-white/5 p-5 text-left transition-all duration-400 ease-soft hover:-translate-y-1 hover:border-white/35 hover:bg-white/10"
                 >
-                  Écrire sur WhatsApp
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.pastille}`}
+                  >
+                    <c.Icone className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-white/50">
+                      {c.canal}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[14.5px] font-semibold">{c.valeur}</span>
+                    <span className="block text-xs text-white/50">{c.delai}</span>
+                  </span>
                 </a>
-              </Magnetic>
+              ))}
             </div>
+
+            <p className="mt-6 text-[13px] text-white/50">
+              Lundi au samedi, 9 h – 19 h · Dakar, Sénégal
+            </p>
           </div>
         </div>
       </Reveal>
