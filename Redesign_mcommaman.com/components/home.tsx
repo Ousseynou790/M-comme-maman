@@ -10,7 +10,6 @@ import {
   GlowCard,
   Magnetic,
   Marquee,
-  Parallax,
   ParallaxFond,
 } from "./motion";
 import { Hero } from "./hero";
@@ -18,7 +17,6 @@ import { ProductCard } from "./product-card";
 import { IconArrow, IconArrowUp, IconLeaf, IconRuler, IconShield, IconSmile } from "./icons";
 import { QuickView } from "./quick-view";
 import { Countdown } from "./countdown";
-import { Universes } from "./universes";
 import { waLink } from "@/lib/format";
 import { PRODUCTS, PROMO_END, type Product } from "@/lib/products";
 
@@ -89,6 +87,56 @@ const PORTES = [
   },
 ];
 
+/* La grille « Nos univers » reprise telle quelle de la maquette boty : une
+   grande tuile, quatre petites, la légende au-dessus du nom et la pastille qui
+   arrive au survol. Les photos sont exactement celles de boty, recopiées dans
+   `public/images/univers/`. Les liens sont traduits vers les filtres du
+   catalogue d'ici (`g`, `age`, `cat`). */
+const TUILES_UNIVERS = [
+  {
+    slug: "filles",
+    label: "Filles",
+    caption: "Robes & jupes",
+    image: "/images/univers/short-fille-blanc-lisse.png",
+    href: "/boutique?g=fille",
+    className: "lg:col-span-2 lg:row-span-2",
+  },
+  {
+    slug: "garcons",
+    label: "Garçons",
+    caption: "Ensembles & sweats",
+    image: "/images/univers/Ensembleenfant-192-retouche.png",
+    href: "/boutique?g=garcon",
+    className: "",
+  },
+  {
+    slug: "bebes",
+    label: "Bébés",
+    caption: "0 à 2 ans",
+    image: "/images/univers/Ensembleenfant-193-retouche.png",
+    href: "/boutique?age=0-1",
+    className: "",
+  },
+  {
+    slug: "chaussures",
+    label: "Chaussures",
+    caption: "Pour bien grandir",
+    image: "/images/univers/chass1.png",
+    href: "/boutique?cat=Chaussures",
+    className: "",
+  },
+  {
+    slug: "accessoires",
+    label: "Accessoires",
+    caption: "Les petits plus",
+    image: "/images/univers/Ensembleenfant-194-retouche.png",
+    /* Pas de rayon « Accessoires » dans ce catalogue : la tuile ouvre la
+       boutique entière plutôt qu'un filtre qui ne renverrait rien. */
+    href: "/boutique",
+    className: "",
+  },
+];
+
 const TABS = [
   { key: "tous", label: "Tous" },
   { key: "fille", label: "Fille" },
@@ -104,25 +152,6 @@ const PROMESSES = [
   { Icone: IconShield, t: "Fait pour durer", s: "Coutures renforcées qui résistent aux jeux et aux lavages." },
   { Icone: IconSmile, t: "Choisis avec amour", s: "Chaque pièce est sélectionnée par notre équipe de mamans." },
 ];
-
-const STORY = [
-  {
-    k: "01",
-    t: "Un carnet d'adresses",
-    s: "Le nom vient de là : des mamans qui se passaient les bonnes pièces, avant qu'il n'y ait la moindre boutique.",
-  },
-  {
-    k: "02",
-    t: "Choisi à Dakar",
-    s: "Chaque référence est vue, touchée, essayée sur de vrais enfants avant d'entrer au catalogue.",
-  },
-  {
-    k: "03",
-    t: "Livré en 24 h",
-    s: "Un appel avant le passage, un livreur qui attend l'essayage, un échange si la taille ne va pas.",
-  },
-];
-
 
 const REVIEWS = [
   { stars: 5, ini: "AF", who: "Aminata F.", what: "Ensemble pyjama à illustration", text: "Commandé le matin, livré le lendemain à Sacré-Cœur. La taille correspond bien à l'âge, le tissu ne gratte pas." },
@@ -454,80 +483,55 @@ export function Home() {
 
       {/* ========================================================== univers */}
       <section className={`${SHELL} pt-16 md:pt-20`}>
-        <Reveal className="mb-9 text-center">
-          <span className={EYEBROW}>Nos univers</span>
-          <h2 className={`${H2} mx-auto mt-2.5 max-w-[18ch] text-balance`}>
-            Chaque rayon, sa pièce du moment
-          </h2>
-          <p className="mx-auto mt-3 max-w-[48ch] text-[14.5px] leading-relaxed text-muted text-pretty">
-            Cinq rayons, et pour chacun ce qui est réellement en stock aujourd&apos;hui. La pile
-            tourne seule ; survolez une carte pour l&apos;arrêter.
-          </p>
+        <Reveal className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <span className={EYEBROW}>Nos univers</span>
+            <h2 className={`${H2} mt-2.5 text-balance`}>Trouvez le style de chaque enfant</h2>
+          </div>
+          <Link
+            href="/boutique"
+            className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold transition-colors duration-300 ease-soft hover:text-rose"
+          >
+            Voir toute la boutique
+            <IconArrowUp className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
         </Reveal>
 
-        <Reveal variant="scale">
-          <Universes />
-        </Reveal>
-      </section>
+        <Reveal
+          className="grid auto-rows-[180px] grid-cols-2 gap-3 sm:auto-rows-[220px] sm:gap-4 lg:grid-cols-4"
+          stagger={110}
+        >
+          {TUILES_UNIVERS.map((tuile) => (
+            <Link
+              key={tuile.slug}
+              href={tuile.href}
+              className={`group relative overflow-hidden rounded-3xl bg-stone shadow-[0_18px_40px_-28px_rgba(36,26,32,.45)] ${tuile.className}`}
+            >
+              <div className="absolute inset-0 overflow-hidden">
+                <Image
+                  src={tuile.image}
+                  alt={tuile.label}
+                  fill
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  className="object-cover transition-transform duration-[1100ms] ease-soft group-hover:scale-105"
+                />
+              </div>
+              <div className="absolute inset-0 bg-linear-to-t from-ink/70 via-ink/10 to-transparent" />
 
-      {/* ========================================================= histoire */}
-      <section className={`${SHELL} pt-16 md:pt-20`}>
-        <div className="overflow-hidden rounded-[26px] bg-mist md:rounded-[30px]">
-          <div className="grid lg:grid-cols-[.9fr_1.1fr]">
-            {/* Le visuel reste accroché pendant que les trois temps défilent. */}
-            <div className="lg:sticky lg:top-[104px] lg:h-[min(78vh,620px)] lg:self-start">
-              <Parallax speed={26} className="h-full">
-                <div className="flex h-full min-h-[240px] items-end bg-[repeating-linear-gradient(135deg,#f2e9ed_0_14px,#f7f0f3_14px_28px)] p-6">
-                  <span className="text-[11.5px] font-semibold leading-relaxed text-muted">
-                    photo à réaliser — mère et enfant
-                    <br />
-                    séance homogène, lumière naturelle
+              <div className="absolute inset-0 flex flex-col justify-end p-5">
+                <p className="text-xs text-white/80">{tuile.caption}</p>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                    {tuile.label}
+                  </h3>
+                  <span className="grid h-9 w-9 shrink-0 -translate-x-2 place-items-center rounded-full bg-white text-ink opacity-0 transition-all duration-400 ease-soft group-hover:translate-x-0 group-hover:opacity-100">
+                    <IconArrowUp className="h-4 w-4" />
                   </span>
                 </div>
-              </Parallax>
-            </div>
-
-            <div className="px-6 py-12 sm:px-10 lg:py-16 lg:pl-12 lg:pr-14">
-              <span className={EYEBROW}>Notre histoire</span>
-              <h2 className="mt-3 text-[clamp(2.1rem,5vw,3rem)] font-extrabold leading-[1.04] tracking-[-.035em]">
-                Le monde
-                <br />
-                des mamans
-              </h2>
-
-              <div className="mt-10 flex flex-col gap-9">
-                {STORY.map((s) => (
-                  <Reveal key={s.k} variant="left">
-                    <div className="flex gap-5 border-t border-line pt-6">
-                      <span className="text-[13px] font-extrabold tabular-nums text-rose">{s.k}</span>
-                      <div>
-                        <div className="text-[17px] font-bold tracking-tight">{s.t}</div>
-                        <p className="mt-2 max-w-[46ch] text-[14.5px] leading-[1.7] text-[#6b5a61] text-pretty">
-                          {s.s}
-                        </p>
-                      </div>
-                    </div>
-                  </Reveal>
-                ))}
               </div>
-
-              <div className="mt-11 flex flex-wrap gap-3">
-                <Link
-                  href="/boutique"
-                  className="shine rounded-full bg-ink px-6 py-3.5 text-sm font-semibold text-white transition-transform duration-400 ease-soft hover:-translate-y-0.5"
-                >
-                  Voir la sélection
-                </Link>
-                <Link
-                  href="/contact"
-                  className="rounded-full border-[1.5px] border-[#e5d9de] bg-white px-6 py-3.5 text-sm font-semibold transition-colors duration-300 hover:border-rose hover:text-rose"
-                >
-                  Nous écrire
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+            </Link>
+          ))}
+        </Reveal>
       </section>
 
       {/* ============================================================= avis */}
