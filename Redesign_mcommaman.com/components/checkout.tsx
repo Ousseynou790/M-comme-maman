@@ -1,54 +1,178 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { formatXOF, waLink } from "@/lib/format";
+import { useRouter } from "next/navigation";
+import { formatXOF } from "@/lib/format";
+import { METHODS, ZONES, findCode, zoneIndex, type MethodKey } from "@/lib/livraison";
+import { useAuth } from "./auth-context";
 import { useCart } from "./cart-context";
+import { useOrders } from "./orders-context";
+import { TextField } from "./form-kit";
+import { IconCheck, IconLock, IconMail, IconPhone, IconPin, IconUser } from "./icons";
 
-const ZONES = [
-  { t: "Dakar et banlieue", s: "24 h · offerte dès 25 000 F", cost: 2000, free: 25000 },
-  { t: "Thiès, Mbour", s: "2 jours · 3 500 F", cost: 3500, free: Infinity },
-  { t: "Autres régions", s: "3 à 4 jours · 3 500 F", cost: 3500, free: Infinity },
-];
-
-const METHODS = [
-  { k: "wave", i: "W", chip: "#e8f1fd", fg: "#1a63c4", t: "Wave", s: "Redirection vers l'application Wave", fee: "1 %" },
-  { k: "om", i: "OM", chip: "#fdeee4", fg: "#c25a12", t: "Orange Money", s: "Code de confirmation par SMS", fee: "1,5 %" },
-  { k: "cb", i: "CB", chip: "#f1eefb", fg: "#5540a8", t: "Carte bancaire", s: "Page sécurisée du prestataire", fee: "2,9 %" },
-  { k: "cod", i: "₣", chip: "#eaf6ef", fg: "#2e7d52", t: "Paiement à la livraison", s: "Espèces ou Wave au livreur, Dakar uniquement", fee: "sans frais" },
-];
-
-const FIELDS = [
-  { l: "Nom complet", v: "Aminata Fall", span: 1 },
-  { l: "Téléphone", v: "+221 77 000 00 00", span: 1 },
-  { l: "Région", v: "Dakar", span: 1 },
-  { l: "Ville", v: "Dakar", span: 1 },
-  { l: "Quartier", v: "Sacré-Cœur 3", span: 1 },
-  { l: "Point de repère", v: "En face de la pharmacie Mermoz", span: 1 },
-  { l: "Instructions pour le livreur (facultatif)", v: "Appeler en arrivant, portail bleu", span: 2 },
-];
+type Champ = "nom" | "tel" | "email" | "ville" | "repere";
 
 export function Checkout({ startAt = 1 }: { startAt?: number }) {
-  const { items, subtotal, bump, remove, optionLabel } = useCart();
+  const router = useRouter();
+  const { items, subtotal, bump, remove, optionLabel, clear } = useCart();
+  const { account, defaultAddress } = useAuth();
+  const { placeOrder } = useOrders();
+
   const [step, setStep] = useState(startAt);
   const [zone, setZone] = useState(0);
-  const [method, setMethod] = useState("wave");
+  const [method, setMethod] = useState<MethodKey>("wave");
+
+  const [nom, setNom] = useState("");
+  const [tel, setTel] = useState("");
+  const [email, setEmail] = useState("");
+  const [ville, setVille] = useState("");
+  const [repere, setRepere] = useState("");
+  const [instructions, setInstructions] = useState("");
+
+  const [touches, setTouches] = useState<Set<Champ>>(new Set());
+  const [tente, setTente] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+
+  const [codeSaisi, setCodeSaisi] = useState("");
+  const [codeApplique, setCodeApplique] = useState<{ code: string; percent: number; label: string } | null>(null);
+  const [codeErreur, setCodeErreur] = useState<string | null>(null);
+
+  /* Ce que le compte sait déjà remplit le formulaire, sans jamais écraser une
+     saisie en cours : `(v) => v || …` ne pose la valeur que si le champ est
+     encore vide. */
+  useEffect(() => {
+    if (!account) return;
+    setNom((v) => v || account.name);
+    setTel((v) => v || account.phone);
+    setEmail((v) => v || account.email);
+
+    if (defaultAddress) {
+      setZone(zoneIndex(defaultAddress.zone));
+      setVille((v) => v || defaultAddress.city);
+      setRepere((v) => v || defaultAddress.address);
+      setInstructions((v) => v || defaultAddress.notes);
+    } else {
+      setVille((v) => v || account.city);
+    }
+  }, [account, defaultAddress]);
 
   const z = ZONES[zone];
-  const shipping = subtotal >= z.free ? 0 : z.cost;
-  const discount = Math.round(subtotal * 0.15);
-  const total = subtotal + shipping - discount;
 
-  const cta = [
-    "Passer à la livraison",
-    "Passer au paiement",
-    `Payer ${formatXOF(total)}`,
-    "Commande confirmée",
-  ][step - 1];
+  /* Le paiement à la livraison ne vaut que pour Dakar : hors zone, on le retire
+     et on repasse sur Wave plutôt que de laisser un choix impossible. */
+  const codDisponible = z.key === "dakar";
+  useEffect(() => {
+    if (!codDisponible && method === "cod") setMethod("wave");
+  }, [codDisponible, method]);
+
+  const shipping = subtotal >= z.free ? 0 : z.cost;
+  const discount = codeApplique ? Math.round((subtotal * codeApplique.percent) / 100) : 0;
+  const total = Math.max(0, subtotal + shipping - discount);
+
+  const erreurs = useMemo(() => {
+    const liste: Partial<Record<Champ, string>> = {};
+    if (nom.trim().length < 3) liste.nom = "Le nom qui figurera sur le colis.";
+    if (!/^[0-9+\s().-]{9,}$/.test(tel.trim())) liste.tel = "Un numéro joignable, par exemple 77 123 45 67.";
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      liste.email = "Cette adresse ne semble pas valide.";
+    if (ville.trim().length < 2) liste.ville = z.key === "dakar" ? "Quartier ou commune." : "Ville de livraison.";
+    if (repere.trim().length < 5) liste.repere = "Un repère aide beaucoup le livreur.";
+    return liste;
+  }, [nom, tel, email, ville, repere, z.key]);
+
+  /* Comme sur les pages compte : le message n'apparaît qu'une fois le champ
+     quitté, ou dès qu'on a tenté de passer à la suite. */
+  const toucher = (champ: Champ) => setTouches((s) => new Set(s).add(champ));
+  const erreurDe = (champ: Champ) => (tente || touches.has(champ) ? erreurs[champ] : undefined);
+  const valideDe = (champ: Champ) => (tente || touches.has(champ)) && !erreurs[champ];
+
+  const appliquerCode = () => {
+    const trouve = findCode(codeSaisi);
+    if (!trouve) {
+      setCodeApplique(null);
+      setCodeErreur("Ce code n'est pas reconnu.");
+      return;
+    }
+    setCodeApplique({ code: codeSaisi.trim().toUpperCase(), ...trouve });
+    setCodeErreur(null);
+  };
+
+  const valider = () => {
+    if (items.length === 0) return;
+
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      setTente(true);
+      if (Object.keys(erreurs).length > 0) return;
+      setStep(3);
+      return;
+    }
+
+    /* On peut atteindre le paiement en cliquant directement sur la puce « 3 » :
+       la livraison est donc revérifiée ici, et on y renvoie s'il manque quelque
+       chose. Sans ça, une commande partait avec un nom et une adresse vides. */
+    setTente(true);
+    if (Object.keys(erreurs).length > 0) {
+      setStep(2);
+      return;
+    }
+
+    /* La commande est enregistrée, le panier vidé, et on part sur son suivi. En
+       ligne, ce bouton lancera le paiement et c'est le webhook signé du
+       prestataire qui validera — jamais ce retour-ci. */
+    setEnvoi(true);
+    const commande = placeOrder({
+      lines: items.map((i) => ({
+        productId: i.id,
+        slug: i.slug,
+        name: i.name,
+        image: i.image,
+        color: i.color,
+        size: i.size,
+        option: optionLabel({ id: i.id, qty: i.qty, color: i.color, size: i.size }),
+        price: i.price,
+        quantity: i.qty,
+      })),
+      subtotal,
+      shipping,
+      discount,
+      promoCode: codeApplique?.code ?? "",
+      total,
+      customer: { name: nom.trim(), phone: tel.trim(), email: email.trim() },
+      delivery: {
+        zone: z.key,
+        city: ville.trim(),
+        address: repere.trim(),
+        notes: instructions.trim(),
+      },
+      payment: method,
+    });
+
+    clear();
+    router.push(`/commandes/${commande.ref}?nouvelle=1`);
+  };
+
+  const cta = ["Passer à la livraison", "Passer au paiement", `Payer ${formatXOF(total)}`][step - 1];
+
+  if (envoi) {
+    return (
+      <div className="mx-auto max-w-[1180px] px-5 py-32 text-center md:px-10">
+        <span className="mx-auto grid h-14 w-14 animate-pulse place-items-center rounded-full bg-rose-soft">
+          <IconCheck className="h-6 w-6 text-rose" />
+        </span>
+        <p className="mt-5 text-[15px] font-semibold">Enregistrement de votre commande…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-[1180px] px-10 pb-22 pt-8">
-      <div className="mb-7 flex items-center gap-3.5">
+    <div className="mx-auto max-w-[1180px] px-5 pb-22 pt-8 md:px-8 lg:px-10">
+      <div className="mb-7 flex flex-wrap items-center gap-3.5">
         {[
           { t: "Panier", i: 1 },
           { t: "Livraison", i: 2 },
@@ -73,11 +197,14 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-[1fr_400px] items-start gap-9">
+      <div className="grid items-start gap-9 lg:grid-cols-[1fr_380px]">
         <div>
+          {/* ============================================================ panier */}
           {step === 1 && (
             <>
-              <h1 className="text-[34px] font-extrabold tracking-[-.03em]">Votre panier</h1>
+              <h1 className="text-[clamp(1.9rem,4.4vw,2.15rem)] font-extrabold tracking-[-.03em]">
+                Votre panier
+              </h1>
               <p className="mb-6 mt-1.5 text-sm text-muted">Commande possible sans créer de compte.</p>
 
               {items.length === 0 ? (
@@ -130,22 +257,105 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
             </>
           )}
 
+          {/* ========================================================= livraison */}
           {step === 2 && (
             <>
-              <h1 className="text-[34px] font-extrabold tracking-[-.03em]">Livraison</h1>
+              <h1 className="text-[clamp(1.9rem,4.4vw,2.15rem)] font-extrabold tracking-[-.03em]">
+                Livraison
+              </h1>
               <p className="mb-6 mt-1.5 text-sm text-muted">
                 L&apos;adressage se fait au quartier et au point de repère, pas au numéro de rue.
               </p>
-              <div className="grid grid-cols-2 gap-4">
-                {FIELDS.map((f) => (
-                  <div key={f.l} style={{ gridColumn: `span ${f.span}` }}>
-                    <div className="mb-2 text-[12.5px] font-bold">{f.l}</div>
-                    <input
-                      defaultValue={f.v}
-                      className="w-full rounded-2xl border-[1.5px] border-[#ece3e7] bg-white px-4 py-3.5 text-sm outline-none focus:border-rose"
-                    />
-                  </div>
-                ))}
+
+              {!account && (
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mist px-5 py-4">
+                  <p className="text-[13px] leading-relaxed text-muted">
+                    Vous avez un compte ? Vos coordonnées et votre adresse se remplissent seules.
+                  </p>
+                  <Link
+                    href="/compte/connexion?suite=/commande"
+                    className="shrink-0 rounded-full bg-ink px-5 py-2.5 text-[13px] font-bold text-white transition-transform duration-400 ease-soft hover:-translate-y-0.5"
+                  >
+                    Se connecter
+                  </Link>
+                </div>
+              )}
+
+              {account && defaultAddress && (
+                <div className="mb-6 rounded-2xl bg-rose-soft px-5 py-4 text-[13px] leading-relaxed text-[#8a2f5d]">
+                  Rempli depuis «&nbsp;{defaultAddress.label}&nbsp;», votre adresse par défaut.{" "}
+                  <Link href="/compte/profil" className="font-bold underline underline-offset-2">
+                    Changer d&apos;adresse
+                  </Link>
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  label="Nom complet"
+                  icon={IconUser}
+                  placeholder="Aminata Fall"
+                  autoComplete="name"
+                  value={nom}
+                  onChange={(e) => setNom(e.target.value)}
+                  onBlur={() => toucher("nom")}
+                  error={erreurDe("nom")}
+                  valid={valideDe("nom")}
+                />
+                <TextField
+                  label="Téléphone"
+                  icon={IconPhone}
+                  inputMode="tel"
+                  placeholder="77 123 45 67"
+                  autoComplete="tel"
+                  value={tel}
+                  onChange={(e) => setTel(e.target.value)}
+                  onBlur={() => toucher("tel")}
+                  error={erreurDe("tel")}
+                  valid={valideDe("tel")}
+                />
+                <TextField
+                  label="Adresse e-mail"
+                  icon={IconMail}
+                  optional
+                  type="email"
+                  placeholder="aminata@exemple.sn"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => toucher("email")}
+                  error={erreurDe("email")}
+                  hint="Pour recevoir le récapitulatif."
+                  className="sm:col-span-2"
+                />
+                <TextField
+                  label={z.key === "dakar" ? "Quartier ou commune" : "Ville"}
+                  icon={IconPin}
+                  placeholder={z.key === "dakar" ? "Sacré-Cœur 3" : "Thiès"}
+                  autoComplete="address-level2"
+                  value={ville}
+                  onChange={(e) => setVille(e.target.value)}
+                  onBlur={() => toucher("ville")}
+                  error={erreurDe("ville")}
+                  valid={valideDe("ville")}
+                />
+                <TextField
+                  label="Point de repère"
+                  placeholder="En face de la pharmacie Mermoz"
+                  value={repere}
+                  onChange={(e) => setRepere(e.target.value)}
+                  onBlur={() => toucher("repere")}
+                  error={erreurDe("repere")}
+                  valid={valideDe("repere")}
+                />
+                <TextField
+                  label="Instructions pour le livreur"
+                  optional
+                  placeholder="Appeler en arrivant, portail bleu"
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  className="sm:col-span-2"
+                />
               </div>
 
               <div className="mt-6.5">
@@ -153,7 +363,7 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
                 <div className="flex flex-wrap gap-2.5">
                   {ZONES.map((zz, i) => (
                     <button
-                      key={zz.t}
+                      key={zz.key}
                       onClick={() => setZone(i)}
                       className={`flex flex-col gap-1 rounded-2xl border-[1.5px] px-4.5 py-3.5 text-left transition-colors ${
                         zone === i ? "border-rose bg-rose-soft" : "border-[#ece3e7] bg-white"
@@ -168,102 +378,164 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
             </>
           )}
 
+          {/* ========================================================== paiement */}
           {step === 3 && (
             <>
-              <h1 className="text-[34px] font-extrabold tracking-[-.03em]">Paiement</h1>
+              <h1 className="text-[clamp(1.9rem,4.4vw,2.15rem)] font-extrabold tracking-[-.03em]">
+                Paiement
+              </h1>
               <p className="mb-6 mt-1.5 text-sm text-muted">
                 La commande n&apos;est validée qu&apos;à réception du webhook signé du prestataire.
               </p>
-              <div className="flex flex-col gap-3">
-                {METHODS.map((m) => (
-                  <button
-                    key={m.k}
-                    onClick={() => setMethod(m.k)}
-                    className={`flex items-center gap-4 rounded-[18px] border-[1.5px] px-5 py-4.5 text-left transition-colors ${
-                      method === m.k ? "border-rose bg-rose-soft" : "border-[#ece3e7] bg-white"
-                    }`}
-                  >
-                    <span
-                      className={`h-5 w-5 shrink-0 rounded-full border-2 ${
-                        method === m.k ? "border-rose bg-rose shadow-[inset_0_0_0_3px_#fff]" : "border-[#d8cbd1] bg-white"
-                      }`}
-                    />
-                    <span
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[13px] font-extrabold"
-                      style={{ background: m.chip, color: m.fg }}
-                    >
-                      {m.i}
-                    </span>
-                    <span className="flex-1">
-                      <span className="block text-[15px] font-bold">{m.t}</span>
-                      <span className="mt-0.5 block text-[13px] text-muted">{m.s}</span>
-                    </span>
-                    <span className="text-[12.5px] font-semibold text-[#9c8d93]">{m.fee}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-5 rounded-2xl bg-gold-soft px-5 py-4 text-[13px] leading-relaxed text-[#5c4a2a]">
-                Trois règles côté serveur : jamais de validation sur le retour navigateur, signature du
-                webhook vérifiée, identifiant de transaction en clé unique pour absorber les doublons.
-              </div>
-            </>
-          )}
 
-          {step === 4 && (
-            <div className="rounded-3xl border border-line p-12 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#eaf6ef] text-2xl text-[#2e7d52]">
-                ✓
+              <div className="flex flex-col gap-3">
+                {METHODS.map((m) => {
+                  const indisponible = m.k === "cod" && !codDisponible;
+                  return (
+                    <button
+                      key={m.k}
+                      disabled={indisponible}
+                      onClick={() => setMethod(m.k)}
+                      className={`flex items-center gap-4 rounded-[18px] border-[1.5px] px-5 py-4.5 text-left transition-colors ${
+                        indisponible
+                          ? "cursor-not-allowed border-[#f2eaee] bg-white opacity-45"
+                          : method === m.k
+                            ? "border-rose bg-rose-soft"
+                            : "border-[#ece3e7] bg-white"
+                      }`}
+                    >
+                      <span
+                        className={`h-5 w-5 shrink-0 rounded-full border-2 ${
+                          method === m.k
+                            ? "border-rose bg-rose shadow-[inset_0_0_0_3px_#fff]"
+                            : "border-[#d8cbd1] bg-white"
+                        }`}
+                      />
+                      <span
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[13px] font-extrabold"
+                        style={{ background: m.chip, color: m.fg }}
+                      >
+                        {m.i}
+                      </span>
+                      <span className="flex-1">
+                        <span className="block text-[15px] font-bold">{m.t}</span>
+                        <span className="mt-0.5 block text-[13px] text-muted">
+                          {indisponible ? "Disponible sur Dakar et banlieue uniquement" : m.s}
+                        </span>
+                      </span>
+                      <span className="text-[12.5px] font-semibold text-[#9c8d93]">{m.fee}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <h1 className="mt-5.5 text-[32px] font-extrabold tracking-[-.03em]">
-                Commande MCM-2026-0043 confirmée
-              </h1>
-              <p className="mx-auto mt-3 max-w-[440px] text-[14.5px] leading-relaxed text-[#6b5a61]">
-                Un SMS et un e-mail de confirmation partent maintenant. Vous serez appelée au
-                77 000 00 00 avant la livraison.
+
+              <div className="mt-5 rounded-2xl bg-gold-soft px-5 py-4 text-[13px] leading-relaxed text-[#5c4a2a]">
+                Trois règles côté serveur : jamais de validation sur le retour navigateur, signature
+                du webhook vérifiée, identifiant de transaction en clé unique pour absorber les
+                doublons.
+              </div>
+
+              <p className="mt-4 flex gap-2.5 rounded-2xl bg-mist px-5 py-4 text-[12.5px] leading-relaxed text-muted">
+                <IconLock className="mt-0.5 h-4 w-4 shrink-0 text-rose" />
+                Maquette : aucun paiement n&apos;est déclenché. La commande est enregistrée dans ce
+                navigateur pour que le suivi ait quelque chose à montrer.
               </p>
-              <div className="mt-6.5 flex justify-center gap-3">
-                <Link href="/" className="rounded-full bg-ink px-6 py-3.5 text-sm font-semibold text-white">
-                  Retour à la boutique
-                </Link>
-                <a
-                  href={waLink("Bonjour, je souhaite suivre ma commande MCM-2026-0043")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border-[1.5px] border-[#e5d9de] px-6 py-3.5 text-sm font-semibold"
-                >
-                  Suivre sur WhatsApp
-                </a>
-              </div>
-            </div>
+            </>
           )}
         </div>
 
-        <aside className="sticky top-30 rounded-3xl border border-line p-6.5">
+        {/* ===================================================== récapitulatif */}
+        <aside className="rounded-3xl border border-line bg-white p-6.5 lg:sticky lg:top-30">
           <div className="text-base font-extrabold tracking-tight">Récapitulatif</div>
+
           <div className="mt-4.5 flex flex-col gap-3 text-sm">
             <div className="flex justify-between text-[#6b5a61]">
               <span>Sous-total</span>
               <span className="tabular-nums">{formatXOF(subtotal)}</span>
             </div>
             <div className="flex justify-between text-[#6b5a61]">
-              <span>Livraison {zone === 0 ? "Dakar" : "régions"}</span>
+              <span>Livraison {z.short}</span>
               <span>{shipping === 0 ? "Offerte" : formatXOF(shipping)}</span>
             </div>
-            <div className="flex justify-between text-[#2e7d52]">
-              <span>Code RENTREE15</span>
-              <span>−{formatXOF(discount)}</span>
-            </div>
+            {codeApplique && (
+              <div className="flex justify-between text-[#2e7d52]">
+                <span>
+                  Code {codeApplique.code}
+                  <button
+                    type="button"
+                    onClick={() => setCodeApplique(null)}
+                    className="ml-2 text-[12px] text-muted underline underline-offset-2"
+                  >
+                    retirer
+                  </button>
+                </span>
+                <span className="tabular-nums">−{formatXOF(discount)}</span>
+              </div>
+            )}
             <div className="flex items-baseline justify-between border-t border-line pt-3.5 text-xl font-extrabold">
               <span>Total</span>
               <span className="tabular-nums">{formatXOF(total)}</span>
             </div>
           </div>
+
+          {/* La remise ne s'applique plus d'office : il faut saisir le code, comme
+              il faudra le faire valider côté serveur. */}
+          {!codeApplique && (
+            <div className="mt-5">
+              <div className="flex gap-2">
+                <input
+                  value={codeSaisi}
+                  onChange={(e) => {
+                    setCodeSaisi(e.target.value);
+                    setCodeErreur(null);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && appliquerCode()}
+                  placeholder="Code de réduction"
+                  aria-label="Code de réduction"
+                  className="w-full min-w-0 rounded-2xl border-[1.5px] border-[#ece3e7] bg-white px-4 py-3 text-sm uppercase outline-none transition-colors placeholder:normal-case placeholder:text-[#b3a5aa] focus:border-rose"
+                />
+                <button
+                  type="button"
+                  onClick={appliquerCode}
+                  disabled={!codeSaisi.trim()}
+                  className="shrink-0 rounded-2xl border-[1.5px] border-[#e5d9de] px-4 text-[13px] font-bold transition-colors duration-300 hover:border-rose hover:text-rose disabled:opacity-40"
+                >
+                  Appliquer
+                </button>
+              </div>
+              {codeErreur && (
+                <p className="mt-1.5 text-[11.5px] font-semibold text-rose-deep">{codeErreur}</p>
+              )}
+            </div>
+          )}
+
           <button
-            onClick={() => setStep((s) => Math.min(4, s + 1))}
-            className="mt-5 w-full rounded-full bg-rose py-4 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(224,65,127,.65)] transition-transform hover:-translate-y-0.5"
+            onClick={valider}
+            disabled={items.length === 0}
+            className="mt-5 w-full rounded-full bg-rose py-4 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(224,65,127,.65)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
           >
             {cta}
           </button>
+
+          {/* Un bouton grisé sans explication laisse croire à une panne : on dit
+              pourquoi il ne part pas. */}
+          {items.length === 0 ? (
+            <p className="mt-3 text-center text-[12.5px] font-semibold text-rose-deep">
+              Votre panier est vide, il n&apos;y a rien à commander.{" "}
+              <Link href="/boutique" className="underline underline-offset-2">
+                Voir la sélection
+              </Link>
+            </p>
+          ) : (
+            tente &&
+            Object.keys(erreurs).length > 0 && (
+              <p className="mt-3 text-center text-[12.5px] font-semibold text-rose-deep">
+                Il manque {Object.keys(erreurs).length} information
+                {Object.keys(erreurs).length > 1 ? "s" : ""} à l&apos;étape Livraison.
+              </p>
+            )
+          )}
+
           <p className="mt-3 text-center text-[12.5px] text-muted">
             Prix figés à la commande — une hausse ultérieure ne réécrit pas la facture.
           </p>

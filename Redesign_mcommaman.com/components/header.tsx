@@ -7,9 +7,19 @@ import { usePathname } from "next/navigation";
 import { CATEGORIES, LOGO, PRODUCTS, byId, countByAge } from "@/lib/products";
 import { formatXOF } from "@/lib/format";
 import { ScrollProgress } from "./motion";
+import { useAuth } from "./auth-context";
 import { useCart } from "./cart-context";
 import { SearchOverlay } from "./search-overlay";
-import { IconArrow, IconBag, IconChevron, IconClose, IconMenu, IconSearch } from "./icons";
+import {
+  IconArrow,
+  IconBag,
+  IconChevron,
+  IconClose,
+  IconMenu,
+  IconPackage,
+  IconSearch,
+  IconUser,
+} from "./icons";
 
 /* Le bandeau dit trois choses, une à la fois : entassées sur une ligne, aucune
    n'est lue. */
@@ -38,6 +48,19 @@ const COUP_DE_COEUR = "p8";
 
 export function Header() {
   const { count, pulse, openDrawer } = useCart();
+  const { account } = useAuth();
+
+  /* Avant l'hydratation, `account` vaut `null` des deux côtés : le premier rendu
+     montre l'icône neutre, les initiales prennent sa place ensuite. */
+  const initiales = account
+    ? account.name
+        .split(" ")
+        .filter(Boolean)
+        .map((mot) => mot[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : null;
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -240,6 +263,30 @@ export function Header() {
                   <kbd className="rounded border border-line px-1.5 text-[10.5px] leading-4 text-muted">/</kbd>
                 </button>
 
+                <Link
+                  href="/commandes"
+                  aria-label="Mes commandes"
+                  title="Suivre mes commandes"
+                  className="grid h-11 w-11 place-items-center text-ink/75 transition-colors hover:text-rose"
+                >
+                  <IconPackage />
+                </Link>
+
+                <Link
+                  href={account ? "/compte" : "/compte/connexion"}
+                  aria-label={account ? "Mon espace client" : "Se connecter"}
+                  title={account ? account.name : "Se connecter"}
+                  className="grid h-11 w-11 place-items-center text-ink/75 transition-colors hover:text-rose"
+                >
+                  {initiales ? (
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-rose text-[11.5px] font-extrabold text-white">
+                      {initiales}
+                    </span>
+                  ) : (
+                    <IconUser />
+                  )}
+                </Link>
+
                 <button
                   type="button"
                   onClick={openDrawer}
@@ -281,6 +328,18 @@ export function Header() {
                     {n.label}
                   </Link>
                 ))}
+                <Link
+                  href="/commandes"
+                  className="py-3 text-[15px] font-medium text-ink/80 transition-colors hover:text-rose"
+                >
+                  Mes commandes
+                </Link>
+                <Link
+                  href={account ? "/compte" : "/compte/connexion"}
+                  className="py-3 text-[15px] font-medium text-ink/80 transition-colors hover:text-rose"
+                >
+                  {account ? "Mon espace client" : "Se connecter"}
+                </Link>
                 <div className="mt-2 flex flex-wrap gap-2 border-t border-line pt-4 pb-2">
                   {CATEGORIES.map((c) => (
                     <Link

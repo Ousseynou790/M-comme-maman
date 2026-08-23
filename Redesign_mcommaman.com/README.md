@@ -25,12 +25,18 @@ npm run dev
 
 | Route | Fichier | Contenu |
 |---|---|---|
-| `/` | `app/page.tsx` → `components/home.tsx` | Bandeau d'accueil en arche (`components/hero.tsx`), bandeau défilant, réassurance, bento des âges, carrousel à onglets, compte à rebours, sélecteur d'univers en pile, histoire en défilement bloqué, paiements, avis en double rang, appel final |
+| `/` | `app/page.tsx` → `components/home.tsx` | Bandeau d'accueil en arche (`components/hero.tsx`), bandeau défilant, réassurance, bento des âges, carrousel à onglets, compte à rebours, sélecteur d'univers en pile, histoire en défilement bloqué, paiements, trois avis en cartes, section « Nous contacter » |
 | `/boutique` | `app/boutique/page.tsx` → `components/catalogue.tsx` | Facettes catégorie / âge / genre, recherche `?q=`, 4 tris, aperçu rapide, pas de pagination |
 | `/p/[slug]` | `app/p/[slug]/page.tsx` | Galerie, variantes couleur / taille, accordéons, recommandations, JSON-LD Product |
 | `/panier` | `app/panier/page.tsx` | Tunnel à l'étape 1 |
-| `/commande` | `app/commande/page.tsx` | Tunnel à l'étape 2 : livraison → paiement → confirmation |
+| `/commande` | `app/commande/page.tsx` | Tunnel à l'étape 2 : livraison validée → paiement → commande enregistrée |
+| `/commandes` | `app/commandes/page.tsx` → `components/orders-list.tsx` | Historique et avancement de chaque colis |
+| `/commandes/[ref]` | `app/commandes/[ref]/page.tsx` → `components/order-detail.tsx` | Suivi détaillé, frise en quatre temps, recommander, annuler |
 | `/contact` | `app/contact/page.tsx` | Formulaire + coordonnées + WhatsApp |
+| `/compte` | `app/compte/page.tsx` → `components/account-dashboard.tsx` | Tableau de bord : panier en cours, adresse par défaut, informations, aide |
+| `/compte/connexion` | `app/compte/connexion/page.tsx` → `components/account-auth.tsx` | Connexion, redirection `?suite=` |
+| `/compte/inscription` | `app/compte/inscription/page.tsx` → `components/account-auth.tsx` | Création de compte, six règles de validation, jauge de mot de passe |
+| `/compte/profil` | `app/compte/profil/page.tsx` → `components/account-profile.tsx` | Informations, carnet d'adresses, tailles suivies, mot de passe, suppression |
 | `/infos/[slug]` | `app/infos/[slug]/page.tsx` | CGV, mentions légales, confidentialité, retours, livraison, FAQ |
 | `/admin` | `app/admin/page.tsx` | Commandes, produits, stock, promotions |
 | `/admin` → Produits → **Nouveau produit** | `components/product-form.tsx` | Création d'une fiche : identité, photos, prix, variantes, aperçu live |
@@ -51,6 +57,48 @@ décide de l'ordre (nom > rayon > âge et genre > description). Le jour où le c
 en base, seule `chercherProduits` devient une requête serveur — sa signature ne bouge pas.
 La palette (`components/search-overlay.tsx`) s'ouvre au clic, à `Ctrl/Cmd + K` et à `/`,
 se pilote aux flèches, et renvoie sur `/boutique?q=…` pour la liste complète.
+
+### Espace client
+
+**`components/auth-context.tsx`** tient les comptes : inscription, connexion, profil, carnet
+d'adresses, tailles suivies, changement de mot de passe, suppression. Deux clés de stockage —
+`mcm-comptes-v1` pour la liste, `mcm-session-v1` pour la session — et un écouteur `storage` pour
+qu'une connexion faite dans un autre onglet suive. Le mot de passe est haché en SHA-256 avec un
+sel tiré au hasard (`crypto.subtle`, donc contexte sécurisé obligatoire : https ou localhost).
+
+**Ce n'est pas une authentification.** Tout vit dans le navigateur : la liste des comptes est
+lisible, la session remplaçable. La mise en ligne demande des comptes en base, un hachage lent
+côté serveur (bcrypt ou argon2), une session en cookie HttpOnly et la vérification de l'adresse
+e-mail. La note en bas de `auth-context.tsx` le redit.
+
+Ce que le compte change ailleurs : l'en-tête montre les initiales et mène à `/compte` ; l'étape
+Livraison du tunnel se pré-remplit depuis l'adresse par défaut, et propose de se connecter
+sinon. Les zones de livraison, partagées entre le tunnel et le carnet d'adresses, vivent dans
+**`lib/livraison.ts`**.
+
+### Commandes et suivi
+
+**`components/orders-context.tsx`** enregistre la commande à la validation : référence
+`MCM-2026-0001` tirée du nombre de commandes déjà passées, cinq statuts (`recue` →
+`preparation` → `expediee` → `livree`, plus `annulee`), clé `mcm-commandes-v1`. Une commande
+s'annule tant qu'elle est encore « reçue », et se remet au panier en un clic — chaque ligne
+garde ses indices de couleur et de taille pour ça.
+
+Le tunnel (`components/checkout.tsx`) valide vraiment : nom, téléphone, quartier et point de
+repère sont obligatoires, l'e-mail est facultatif mais vérifié s'il est saisi, et les messages
+n'apparaissent qu'au `blur` ou à la tentative de passage. Le paiement à la livraison disparaît
+hors de Dakar. La remise n'est plus appliquée d'office : il faut saisir le code (`CODES` dans
+`lib/livraison.ts`).
+
+Le panier persiste lui aussi (`mcm-panier-v1`) : il partait d’un panier de démonstration
+remis à zéro à chaque rechargement, ce qui donnait l’impression qu’une commande validée
+n’avait rien enregistré. Le panier de démonstration ne sert plus que tant que ce navigateur
+n’a rien mis dedans.
+
+**Le statut ne bouge pas tout seul.** Rien ne le fait avancer côté client — c'est le
+back-office qui le pilotera. En ligne, il faudra aussi : commande écrite en base, référence
+tirée d'une séquence serveur, et validation du paiement par le webhook signé du prestataire,
+jamais par le retour du navigateur.
 
 ### Publication d'un produit
 
@@ -193,7 +241,8 @@ alors quatre ou cinq photos de vie de ce niveau.
 1. Séance photo homogène, puis remplacement des URL du CDN Shopify
 2. Prisma + PostgreSQL (Neon), migration des 19 produits avec de vrais noms commerciaux
 3. PayDunya : webhook signé, identifiant de transaction en clé unique, idempotence
-4. Paiement à la livraison conditionné à la zone
+4. Paiement à la livraison conditionné à la zone — fait côté client, reste à refuser côté serveur
 5. Resend pour les e-mails de confirmation
-6. NINEA et registre du commerce à renseigner dans `lib/legal.ts`
-7. Test sur vrai téléphone en 4G — la cible est mobile
+6. Comptes clients côté serveur : `auth-context.tsx` en est la maquette, pas l'implémentation
+7. NINEA et registre du commerce à renseigner dans `lib/legal.ts`
+8. Test sur vrai téléphone en 4G — la cible est mobile

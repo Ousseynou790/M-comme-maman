@@ -173,6 +173,174 @@ export function IconSmile({ className }: Props) {
   );
 }
 
+/* -------------------------------------------------------- suivi de commande */
+
+export function IconPackage({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M11 21.6a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 15.9V8.1a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8.1v7.8a2 2 0 0 0 1 1.7Z" />
+      <path d="M12 22V12" />
+      <path d="M3.3 7 12 12l8.7-5" />
+    </Svg>
+  );
+}
+
+/** Carton dont les rabats s'ouvrent : la commande est en préparation. */
+export function IconBoxOpen({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M3.6 9.6v8a1.6 1.6 0 0 0 1.1 1.52l6.8 2.3a1.6 1.6 0 0 0 1 0l6.8-2.3a1.6 1.6 0 0 0 1.1-1.52v-8" />
+      <path d="M12 21.5V9.6" />
+      <path d="M3.6 9.6 7.5 3.4 12 9.6" />
+      <path d="M20.4 9.6 16.5 3.4 12 9.6" />
+    </Svg>
+  );
+}
+
+export function IconTruck({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <path d="M15 18H9" />
+      <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+      <circle cx="17" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+    </Svg>
+  );
+}
+
+export function IconHome({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+      <path d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </Svg>
+  );
+}
+
+/** Flèche qui boucle : remettre les articles d'une commande au panier. */
+export function IconRefresh({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M20.4 12a8.4 8.4 0 1 1-2.46-5.94" />
+      <path d="M20.4 4.2v4.4H16" />
+    </Svg>
+  );
+}
+
+/* ---------------------------------------------------------- espace client */
+
+export function IconGrid({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <rect x="3.6" y="3.6" width="7" height="7" rx="2" />
+      <rect x="13.4" y="3.6" width="7" height="7" rx="2" />
+      <rect x="3.6" y="13.4" width="7" height="7" rx="2" />
+      <rect x="13.4" y="13.4" width="7" height="7" rx="2" />
+    </Svg>
+  );
+}
+
+export function IconUser({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="8.2" r="3.9" />
+      <path d="M4.6 20.2c.9-3.6 3.8-5.6 7.4-5.6s6.5 2 7.4 5.6" />
+    </Svg>
+  );
+}
+
+export function IconLock({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <rect x="4.4" y="10.2" width="15.2" height="9.6" rx="2.4" />
+      <path d="M8.2 10.2V7.9a3.8 3.8 0 0 1 7.6 0v2.3" />
+    </Svg>
+  );
+}
+
+export function IconPhone({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M15.6 20.6A13.6 13.6 0 0 1 3.4 8.4 2.4 2.4 0 0 1 5.8 5.6h2a1.6 1.6 0 0 1 1.6 1.4c.1.8.3 1.6.6 2.3a1.6 1.6 0 0 1-.4 1.7l-.9.9a12 12 0 0 0 4.4 4.4l.9-.9a1.6 1.6 0 0 1 1.7-.4c.7.3 1.5.5 2.3.6a1.6 1.6 0 0 1 1.4 1.6v2a2.4 2.4 0 0 1-2.8 2.4Z" />
+    </Svg>
+  );
+}
+
+export function IconPin({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M12 21.2s6.6-5.2 6.6-10.4a6.6 6.6 0 1 0-13.2 0C5.4 16 12 21.2 12 21.2Z" />
+      <circle cx="12" cy="10.6" r="2.4" />
+    </Svg>
+  );
+}
+
+export function IconPlus({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M12 5.2v13.6M5.2 12h13.6" />
+    </Svg>
+  );
+}
+
+export function IconTrash({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M4.8 7h14.4" />
+      <path d="M9.4 7V5.6a1.4 1.4 0 0 1 1.4-1.4h2.4a1.4 1.4 0 0 1 1.4 1.4V7" />
+      <path d="m6.6 7 .8 11.6a1.8 1.8 0 0 0 1.8 1.6h5.6a1.8 1.8 0 0 0 1.8-1.6L17.4 7" />
+      <path d="M10.4 11v5.4M13.6 11v5.4" />
+    </Svg>
+  );
+}
+
+export function IconStar({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="m12 3.8 2.6 5.2 5.8.8-4.2 4.1 1 5.7-5.2-2.7-5.2 2.7 1-5.7L3.6 9.8l5.8-.8Z" />
+    </Svg>
+  );
+}
+
+export function IconCheck({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="m4.8 12.6 4.6 4.6 9.8-10.4" />
+    </Svg>
+  );
+}
+
+export function IconLogout({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M14.6 7.4V5.8a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2v12.4a2 2 0 0 0 2 2h6.4a2 2 0 0 0 2-2v-1.6" />
+      <path d="M9.6 12h10.2M17 9.2l2.8 2.8-2.8 2.8" />
+    </Svg>
+  );
+}
+
+/** Œil ouvert / barré : montrer ou masquer un mot de passe saisi. */
+export function IconEye({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M2.6 12S6.2 5.8 12 5.8 21.4 12 21.4 12 17.8 18.2 12 18.2 2.6 12 2.6 12Z" />
+      <circle cx="12" cy="12" r="3.1" />
+    </Svg>
+  );
+}
+
+export function IconEyeOff({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M9.8 6.2A9.2 9.2 0 0 1 12 5.8c5.8 0 9.4 6.2 9.4 6.2a17.4 17.4 0 0 1-3.1 3.8" />
+      <path d="M6.5 7.7A17 17 0 0 0 2.6 12S6.2 18.2 12 18.2c1.3 0 2.5-.3 3.6-.7" />
+      <path d="M10 10a2.8 2.8 0 0 0 4 4" />
+      <path d="m4 4 16 16" />
+    </Svg>
+  );
+}
+
 export function IconMail({ className }: Props) {
   return (
     <Svg className={className}>

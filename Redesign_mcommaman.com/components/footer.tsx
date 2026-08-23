@@ -17,6 +17,8 @@ const COLUMNS = [
       { href: "/infos/retours", label: "Retours" },
       { href: "/infos/faq", label: "Questions fréquentes" },
       { href: "/contact", label: "Nous contacter" },
+      { href: "/compte", label: "Mon compte" },
+      { href: "/commandes", label: "Suivre ma commande" },
     ],
   },
   {

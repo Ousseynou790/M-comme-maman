@@ -1,9 +1,19 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { PRODUCTS, byId, COLORS, SIZES, type Product } from "@/lib/products";
 
+const CLE_PANIER = "mcm-panier-v1";
+
 export type Line = { id: string; qty: number; color: number; size: number };
+
+/* Le panier de démonstration, servi tant que ce navigateur n'a jamais rien mis
+   dedans. Dès la première modification, c'est le contenu enregistré qui prime —
+   y compris un panier vide après une commande. */
+const DEMO: Line[] = [
+  { id: "p3", qty: 1, color: 0, size: 2 },
+  { id: "p12", qty: 1, color: 1, size: 0 },
+];
 
 type Ctx = {
   lines: Line[];
@@ -15,6 +25,8 @@ type Ctx = {
   add: (id: string, color?: number, size?: number) => void;
   bump: (id: string, delta: number) => void;
   remove: (id: string) => void;
+  /** Vide le panier — appelé une fois la commande enregistrée. */
+  clear: () => void;
   openDrawer: () => void;
   closeDrawer: () => void;
   optionLabel: (line: Line) => string;
@@ -23,12 +35,35 @@ type Ctx = {
 const CartContext = createContext<Ctx | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [lines, setLines] = useState<Line[]>([
-    { id: "p3", qty: 1, color: 0, size: 2 },
-    { id: "p12", qty: 1, color: 1, size: 0 },
-  ]);
+  const [lines, setLines] = useState<Line[]>(DEMO);
   const [pulse, setPulse] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  /* Lecture différée, comme les comptes et les commandes : le premier rendu
+     doit rester identique côté serveur et client, d'où le panier de
+     démonstration en valeur de départ des deux côtés. */
+  useEffect(() => {
+    try {
+      const brut = window.localStorage.getItem(CLE_PANIER);
+      if (brut) {
+        const lu: unknown = JSON.parse(brut);
+        if (Array.isArray(lu)) setLines(lu as Line[]);
+      }
+    } catch {
+      /* stockage indisponible ou corrompu : on garde le panier de démonstration */
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(CLE_PANIER, JSON.stringify(lines));
+    } catch {
+      /* quota dépassé : le panier reste affiché, seule la persistance est perdue */
+    }
+  }, [lines, hydrated]);
 
   const add = useCallback((id: string, color = 0, size = 2) => {
     setLines((prev) => {
@@ -55,6 +90,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLines((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
+  const clear = useCallback(() => setLines([]), []);
+
   const items = useMemo(
     () =>
       lines.flatMap((l) => {
@@ -74,6 +111,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     add,
     bump,
     remove,
+    clear,
     openDrawer: () => setDrawerOpen(true),
     closeDrawer: () => setDrawerOpen(false),
     optionLabel: (l) => `${COLORS[l.color].name} · ${SIZES[l.size]}`,

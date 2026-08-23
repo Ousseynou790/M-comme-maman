@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/components/auth-context";
 import { CartProvider } from "@/components/cart-context";
+import { OrdersProvider } from "@/components/orders-context";
 
 export const metadata: Metadata = {
   title: {
@@ -28,7 +30,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans antialiased">
-        <CartProvider>{children}</CartProvider>
+        <AuthProvider>
+          <OrdersProvider>
+            <CartProvider>{children}</CartProvider>
+          </OrdersProvider>
+        </AuthProvider>
       </body>
     </html>
   );
