@@ -407,7 +407,7 @@ export function Magnetic({
  * est invisible.
  *
  * Le défilement s'arrête dès que quelqu'un s'en occupe : survol, traînée,
- * molette, doigt, flèches, focus clavier, onglet en arrière-plan. Et il ne
+ * molette, doigt, focus clavier, onglet en arrière-plan. Et il ne
  * démarre pas du tout si le mouvement réduit est demandé, ou si les pièces
  * tiennent déjà dans la largeur.
  */
@@ -425,7 +425,6 @@ export function Carousel({
 }) {
   const railRef = useRef<HTMLDivElement>(null);
   const passRef = useRef<HTMLDivElement>(null);
-  const [progress, setProgress] = useState(0);
   const [loop, setLoop] = useState(false);
 
   /* Position tenue en flottant : `scrollLeft` seul perdrait les sous-pixels
@@ -451,7 +450,6 @@ export function Carousel({
     /* Une piste plus étroite que le rail ne peut pas boucler sans laisser un
        trou : on reste alors sur un rail simple, sans défilement automatique. */
     setLoop(width > el.clientWidth + 40);
-    setProgress(width > 0 ? (el.scrollLeft % width) / width : 0);
   };
 
   useEffect(() => {
@@ -564,28 +562,6 @@ export function Carousel({
     };
   }, []);
 
-  /* Le rail boucle : les flèches n'ont ni début ni fin à buter. */
-  const page = (dir: 1 | -1) => {
-    const el = railRef.current;
-    if (!el) return;
-    hold();
-    const width = loopWidthRef.current;
-    let next = el.scrollLeft + dir * el.clientWidth * 0.85;
-    if (loop && width > 0) next = ((next % width) + width) % width;
-    el.scrollTo({ left: next, behavior: "smooth" });
-  };
-
-  const onScroll = () => {
-    const el = railRef.current;
-    const width = loopWidthRef.current;
-    if (!el) return;
-    if (loop && width > 0) setProgress((el.scrollLeft % width) / width);
-    else {
-      const max = el.scrollWidth - el.clientWidth;
-      setProgress(max > 8 ? el.scrollLeft / max : 0);
-    }
-  };
-
   const pass = <div ref={passRef} className="flex shrink-0 gap-4">{children}</div>;
 
   return (
@@ -593,7 +569,6 @@ export function Carousel({
       <div
         ref={railRef}
         className={`rail -mx-5 gap-4 px-5 pb-2 md:-mx-8 md:px-8 lg:-mx-10 lg:px-10 ${loop ? "rail-auto" : ""}`}
-        onScroll={onScroll}
         role="group"
         aria-label={label}
       >
@@ -608,26 +583,6 @@ export function Carousel({
         )}
       </div>
 
-      <div className="mt-6 flex items-center gap-5">
-        <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-line">
-          <div
-            className="h-full rounded-full bg-rose"
-            style={{ width: "34%", transform: `translateX(${(progress * (100 / 0.34 - 100)).toFixed(1)}%)` }}
-          />
-        </div>
-        <div className="flex gap-2">
-          {([-1, 1] as const).map((dir) => (
-            <button
-              key={dir}
-              onClick={() => page(dir)}
-              aria-label={dir === -1 ? "Voir les pièces précédentes" : "Voir les pièces suivantes"}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-cream text-lg transition-all duration-300 ease-soft hover:border-ink hover:bg-ink hover:text-white"
-            >
-              {dir === -1 ? "←" : "→"}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

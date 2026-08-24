@@ -3,9 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatXOF } from "@/lib/format";
-import { COLORS, type Product } from "@/lib/products";
+import { type Product } from "@/lib/products";
 import { useCart } from "./cart-context";
 import { useSpotlight } from "./motion";
+import { IconBag, IconHeart, IconHeartFull } from "./icons";
+
+/* Les deux pastilles posées au bas de la photo : même dessin, même montée au
+   survol, seul le coin change. Rien ne se déclenche au doigt, où le lien de la
+   carte occupe déjà toute la surface. */
+const ACTION =
+  "absolute z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur transition-all duration-300 ease-soft hover:bg-rose hover:text-white sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100";
 
 export function ProductCard({
   product,
@@ -19,7 +26,10 @@ export function ProductCard({
 }) {
   const ref = useSpotlight<HTMLDivElement>();
   const { add } = useCart();
-  const [color, setColor] = useState(0);
+
+  /* Le cœur ne vit que le temps de la visite : il n'y a pas encore de liste
+     de favoris, ni côté serveur ni en mémoire partagée. */
+  const [aime, setAime] = useState(false);
 
   const discount = product.compareAt
     ? Math.round((1 - product.price / product.compareAt) * 100)
@@ -44,11 +54,6 @@ export function ProductCard({
           style={{ backgroundImage: `url(${product.image})` }}
         />
 
-        {/* Teinte de la couleur choisie, très légère : la photo reste la photo. */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-0 mix-blend-soft-light transition-opacity duration-500 group-hover:opacity-60"
-          style={{ background: COLORS[color].hex }}
-        />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 translate-y-6 bg-linear-to-t from-ink/55 via-ink/15 to-transparent opacity-0 transition-all duration-500 ease-soft group-hover:translate-y-0 group-hover:opacity-100" />
 
         <div className="absolute left-3 top-3 z-20 flex flex-col items-start gap-1.5">
@@ -64,40 +69,38 @@ export function ProductCard({
           )}
         </div>
 
-        {/* Nuanciers : au survol sur grand écran, toujours visibles au doigt. */}
-        <div className="absolute right-3 top-3 z-20 flex flex-col gap-1.5 sm:translate-x-3 sm:opacity-0 sm:transition-all sm:duration-400 sm:ease-soft sm:group-hover:translate-x-0 sm:group-hover:opacity-100">
-          {COLORS.map((c, i) => (
-            <button
-              key={c.name}
-              onClick={() => setColor(i)}
-              aria-label={`Voir en ${c.name}`}
-              aria-pressed={color === i}
-              className={`h-5 w-5 rounded-full border-2 transition-transform duration-300 ease-back hover:scale-115 ${
-                color === i ? "border-white shadow-[0_0_0_1.5px_rgba(36,26,32,.35)]" : "border-white/70"
-              }`}
-              style={{ background: c.hex }}
-            />
-          ))}
-        </div>
+        {/* Le cœur reste visible en permanence, comme sur la maquette boty :
+            c'est le seul geste qui ne coûte rien, il ne se mérite pas au
+            survol. */}
+        <button
+          onClick={() => setAime((v) => !v)}
+          aria-pressed={aime}
+          aria-label={aime ? `Retirer ${product.name} des favoris` : `Ajouter ${product.name} aux favoris`}
+          className={`absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 backdrop-blur transition-all duration-300 ease-soft hover:scale-105 active:scale-90 ${
+            aime ? "text-rose" : "text-ink/70 hover:text-rose"
+          }`}
+        >
+          {aime ? <IconHeartFull className="h-4 w-4" /> : <IconHeart className="h-4 w-4" />}
+        </button>
 
         {!product.outOfStock && (
-          <div className="absolute inset-x-3 bottom-3 z-20 flex gap-2 sm:translate-y-4 sm:opacity-0 sm:transition-all sm:duration-400 sm:ease-soft sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
-            <button
-              onClick={() => add(product.id, color)}
-              className="shine flex-1 rounded-full bg-ink py-2.5 text-[12.5px] font-bold text-white transition-colors duration-300 hover:bg-rose"
-            >
-              Ajouter
-            </button>
-            {onQuickView && (
-              <button
-                onClick={() => onQuickView(product)}
-                aria-label={`Aperçu rapide de ${product.name}`}
-                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-white/95 text-[13px] backdrop-blur transition-colors duration-300 hover:bg-rose hover:text-white"
-              >
-                ⤢
-              </button>
-            )}
-          </div>
+          <button
+            onClick={() => add(product.id)}
+            aria-label={`Ajouter ${product.name} au panier`}
+            className={`${ACTION} bottom-3 left-3`}
+          >
+            <IconBag className="h-4 w-4" />
+          </button>
+        )}
+
+        {onQuickView && (
+          <button
+            onClick={() => onQuickView(product)}
+            aria-label={`Aperçu rapide de ${product.name}`}
+            className={`${ACTION} bottom-3 right-3 text-[13px]`}
+          >
+            ⤢
+          </button>
         )}
       </div>
 

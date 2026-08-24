@@ -368,3 +368,33 @@ export function IconWhatsApp({ className = base }: Props) {
     </svg>
   );
 }
+
+/** Gmail : le logo de 2020, avec ses cinq aplats. Seule icône du jeu à porter
+    ses propres couleurs — un logo de marque repeint n'est plus le logo. Elle
+    ignore donc `currentColor` et veut un fond clair derrière elle. */
+export function IconGmail({ className = base }: Props) {
+  return (
+    <svg viewBox="0 0 256 193" aria-hidden="true" className={className}>
+      <path
+        fill="#4285f4"
+        d="M58.18 192.05V93.14L27.5 65.08 0 49.5v127.05c0 8.55 6.95 15.5 15.52 15.5z"
+      />
+      <path
+        fill="#34a853"
+        d="M197.82 192.05h42.66c8.57 0 15.52-6.95 15.52-15.5V49.5l-31.17 17.8-27.01 25.84z"
+      />
+      <path
+        fill="#ea4335"
+        d="M58.18 93.14 54 54.5l4.18-37L128 69.87l69.82-52.37 4.67 35-4.67 40.64L128 145.5z"
+      />
+      <path
+        fill="#fbbc04"
+        d="M197.82 17.5v75.64L256 49.5V25.16c0-22.58-25.79-35.46-43.83-21.92z"
+      />
+      <path
+        fill="#c5221f"
+        d="M0 49.5l26.76 20.07L58.18 93.14V17.5L43.83 3.24C25.76-10.3 0 2.58 0 25.16z"
+      />
+    </svg>
+  );
+}

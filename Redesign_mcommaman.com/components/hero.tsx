@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { CountUp, Magnetic, SplitText, useSpotlight } from "./motion";
 import { IconArrow, IconWhatsApp } from "./icons";
 import { formatXOF, waLink } from "@/lib/format";
-import { HERO_SLIDES, HERO_VIGNETTES, byId } from "@/lib/products";
+import { HERO_VIDEOS, HERO_VIGNETTES, byId } from "@/lib/products";
 
 /* ------------------------------------------------------------------ la parole
    Tout le texte du bandeau tient ici : la pastille, trois lignes de titre dont
    la dernière porte l'accent, et le chapô. Changer l'accroche, c'est changer
-   ces quatre constantes. Les photos, elles, sont dans `HERO_SLIDES`
+   ces quatre constantes. Les vidéos, elles, sont dans `HERO_VIDEOS`
    (lib/products.ts). */
 
 const EYEBROW = "Nouvelle collection · 2026";
@@ -20,27 +20,33 @@ const TITRE_ACCENT = "leurs aventures.";
 const CHAPO =
   "Des pièces joyeuses, faciles à vivre et choisies avec le regard exigeant d’une maman.";
 
-/* Le titre ne bouge pas d'une photo à l'autre : c'est la promesse de la
-   boutique, pas une légende. Seuls la photo, son étiquette et la pièce
+/* Le titre ne bouge pas d'une séquence à l'autre : c'est la promesse de la
+   boutique, pas une légende. Seuls la vidéo, son étiquette et la pièce
    proposée en dessous changent. */
 
-/** Temps d'affichage d'une photo. La barre de progression lit la même valeur. */
+/** Repli si la durée de la vidéo n'est pas encore connue : le minuteur et la
+    barre de progression lisent tous les deux cette valeur. */
 const DUREE = 6500;
 
-/** Un halo par photo : le fond se teinte de ce que la photo a de dominant. */
-const HALOS = ["bg-gold-soft/85", "bg-rose-soft/85", "bg-gold-soft/85"];
+/** Un halo par séquence : le fond se teinte de ce que l'image a de dominant. */
+const HALOS = ["bg-gold-soft/85", "bg-rose-soft/85"];
 
 export function Hero() {
   const [actif, setActif] = useState(0);
   const [pause, setPause] = useState(false);
 
-  const slide = HERO_SLIDES[actif];
-  const vedette = byId(slide.piece);
+  const vedette = byId(HERO_VIDEOS[actif].piece);
 
   /* L'inclinaison est portée par un calque au-dessus de l'arche : posée sur
      l'arche elle-même, elle se battrait avec l'animation d'entrée, qui écrit
      déjà dans `transform`. */
   const inclinaison = useSpotlight<HTMLDivElement>(5);
+
+  /* La séquence dure ce que dure sa vidéo. Tant que le navigateur ne l'a pas
+     annoncée, on retombe sur `DUREE` : le bandeau ne doit jamais se figer en
+     attendant un fichier. */
+  const [duree, setDuree] = useState(DUREE);
+  const videos = useRef<(HTMLVideoElement | null)[]>([]);
 
   /* Minuteur relancé à chaque changement : cliquer une barre redonne le temps
      de plein, au lieu d'enchaîner sur le reliquat du tour précédent. */
@@ -48,10 +54,31 @@ export function Hero() {
     if (pause) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = window.setTimeout(
-      () => setActif((a) => (a + 1) % HERO_SLIDES.length),
-      DUREE
+      () => setActif((a) => (a + 1) % HERO_VIDEOS.length),
+      duree
     );
     return () => window.clearTimeout(t);
+  }, [actif, pause, duree]);
+
+  /* Une seule vidéo joue à la fois : les autres sont remises à zéro, sinon
+     elles reprennent en plein milieu au tour suivant. Le survol met la lecture
+     en pause en même temps que le minuteur. */
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    videos.current.forEach((v, i) => {
+      if (!v) return;
+      if (i !== actif) {
+        v.pause();
+        v.currentTime = 0;
+      } else if (pause) {
+        v.pause();
+      } else {
+        /* Refusée par le navigateur — onglet en arrière-plan, économie de
+           batterie — la lecture n'est pas une erreur : le poster reste. */
+        void v.play().catch(() => {});
+      }
+    });
   }, [actif, pause]);
 
   return (
@@ -185,19 +212,32 @@ export function Hero() {
 
             <div ref={inclinaison} className="tilt">
               <div className="anim-arch relative aspect-4/5 overflow-hidden rounded-t-[999px] rounded-b-[32px] bg-stone shadow-[0_60px_110px_-55px_rgba(36,26,32,.6)] ring-1 ring-ink/5">
-                {/* Les trois photos restent empilées : un fondu enchaîné ne peut
-                    pas se faire si l'ancienne est démontée avant la nouvelle. */}
-                {HERO_SLIDES.map((s, i) => (
-                  <Image
+                {/* Les vidéos restent empilées : un fondu enchaîné ne peut pas
+                    se faire si l'ancienne est démontée avant la nouvelle. Muettes
+                    et `playsInline`, seules conditions pour qu'un mobile accepte
+                    de les lancer sans geste de l'utilisateur. */}
+                {HERO_VIDEOS.map((s, i) => (
+                  <video
                     key={s.src}
+                    ref={(el) => {
+                      videos.current[i] = el;
+                    }}
                     src={s.src}
-                    alt={i === actif ? s.alt : ""}
+                    poster={s.poster}
+                    aria-label={i === actif ? s.alt : undefined}
                     aria-hidden={i !== actif}
-                    fill
-                    priority={i === 0}
-                    sizes="(max-width: 1024px) 90vw, 480px"
+                    muted
+                    loop
+                    playsInline
+                    preload={i === 0 ? "auto" : "metadata"}
+                    onLoadedMetadata={(e) => {
+                      /* La séquence dure ce que dure sa vidéo, à la seconde près. */
+                      if (i !== actif) return;
+                      const d = e.currentTarget.duration;
+                      if (Number.isFinite(d) && d > 0) setDuree(d * 1000);
+                    }}
                     style={{ objectPosition: s.pos }}
-                    className={`object-cover transition-[opacity,transform] duration-[1400ms] ease-soft ${
+                    className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-[1400ms] ease-soft ${
                       i === actif ? "scale-100 opacity-100" : "scale-[1.06] opacity-0"
                     }`}
                   />
@@ -269,50 +309,6 @@ export function Hero() {
             )}
           </div>
 
-          {/* Étiquette et barres : de quoi savoir où on en est, et reprendre la
-              main. La barre en cours se remplit sur la durée du minuteur. */}
-          <div className="anim-hero mx-auto mt-7 flex w-full max-w-[420px] items-center justify-between gap-4 lg:ml-auto lg:mr-0 lg:max-w-[480px] [animation-delay:1s]">
-            <div className="min-w-0">
-              <div key={actif} className="anim-tick text-[13px] font-bold">
-                {slide.tag}
-              </div>
-              <div className="mt-0.5 text-[11.5px] font-medium tabular-nums text-muted">
-                {String(actif + 1).padStart(2, "0")} / {String(HERO_SLIDES.length).padStart(2, "0")}
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              {HERO_SLIDES.map((s, i) => (
-                <button
-                  key={s.src}
-                  type="button"
-                  onClick={() => setActif(i)}
-                  aria-label={`Voir la photo « ${s.tag} »`}
-                  aria-current={i === actif}
-                  /* La barre fait 3 px de haut, le bouton 32 : au doigt, une
-                     cible de 3 px est inatteignable. */
-                  className="group grid h-8 place-items-center px-0.5"
-                >
-                  <span
-                    className={`relative block h-[3px] overflow-hidden rounded-full bg-ink/12 transition-all duration-500 ease-soft ${
-                      i === actif ? "w-14" : "w-6 group-hover:bg-ink/30"
-                    }`}
-                  >
-                    {i === actif && (
-                      <span
-                        key={actif}
-                        className="hero-fill absolute inset-0 block bg-rose"
-                        style={{
-                          animationDuration: `${DUREE}ms`,
-                          animationPlayState: pause ? "paused" : "running",
-                        }}
-                      />
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </section>

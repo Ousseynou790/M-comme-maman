@@ -17,8 +17,8 @@ import { ProductCard } from "./product-card";
 import {
   IconArrow,
   IconArrowUp,
+  IconGmail,
   IconLeaf,
-  IconMail,
   IconQuote,
   IconRuler,
   IconShield,
@@ -44,57 +44,6 @@ const TICKER = [
   "Échange sous 7 jours",
   "Stock réel, photos réelles",
   "Conseils de taille sur WhatsApp",
-];
-
-const cdn = (f: string) => `https://mcommaman.com/cdn/shop/files/${f}`;
-
-/* Les portes d'entrée du catalogue, reprises de la maquette boty : une grande
-   tuile puis quatre petites, la légende au-dessus du nom. On entre par qui
-   porte la pièce plutôt que par le rayon — le rayon, lui, a sa section plus
-   bas. La première tuile occupe deux colonnes et deux rangées.
-
-   Les photos sont celles du shooting maison, servies depuis `public/` : des
-   enfants habillés, pas des vêtements sur cintre. Seules les chaussures
-   gardent leur visuel de catalogue, qui montre mieux la paire qu'un pied.
-   `pos` recadre : ces tuiles sont larges, les photos sont hautes. */
-const PORTES = [
-  {
-    t: "Filles",
-    s: "Robes & jupes",
-    href: "/boutique?g=fille",
-    src: "/images/portes/filles.webp",
-    pos: "50% 28%",
-  },
-  {
-    t: "Garçons",
-    s: "Ensembles & sweats",
-    href: "/boutique?g=garcon",
-    src: "/images/portes/garcons.webp",
-    /* Deux enfants en pied dans une tuile paysage : centrée, la coupe passait
-       sous les visages. On garde le haut. */
-    pos: "50% 15%",
-  },
-  {
-    t: "Bébés",
-    s: "0 à 1 an",
-    href: "/boutique?age=0-1",
-    src: "/images/portes/bebes.webp",
-    pos: "48% 42%",
-  },
-  {
-    t: "Chaussures",
-    s: "Pour bien grandir",
-    href: "/boutique?cat=Chaussures",
-    src: cdn("chass1.png?v=1784826770&width=900"),
-    pos: "50% 50%",
-  },
-  {
-    t: "Grands",
-    s: "10 à 15 ans",
-    href: "/boutique?age=10-15",
-    src: "/images/portes/grands.webp",
-    pos: "56% 38%",
-  },
 ];
 
 /* La grille « Nos univers » reprise telle quelle de la maquette boty : une
@@ -213,7 +162,7 @@ const CONTACT = [
     href: waLink("Bonjour, j'ai une question"),
     externe: true,
     Icone: IconWhatsApp,
-    pastille: "bg-rose text-white",
+    pastille: "bg-[#25d366] text-white",
   },
   {
     canal: "Courriel",
@@ -221,15 +170,10 @@ const CONTACT = [
     delai: "Réponse sous 24 h",
     href: "mailto:mamand202122@gmail.com",
     externe: false,
-    Icone: IconMail,
-    pastille: "bg-gold text-ink",
+    Icone: IconGmail,
+    pastille: "bg-white",
   },
 ];
-
-/* Le mot qui traverse la bande promo, en très grand et presque effacé. Assez
-   d'entrées pour qu'une passe dépasse la largeur de l'écran : la piste est
-   doublée puis translatée de moitié, une passe trop courte laisserait un trou. */
-const RUBAN = ["Rentrée des classes", "−15 %", "Ensembles", "−15 %"];
 
 /* Date de fin lue dans `PROMO_END`, sans passer par `Date` : le serveur et le
    navigateur n'ont pas forcément le même fuseau, et la journée aurait pu
@@ -302,60 +246,50 @@ export function Home() {
         </Reveal>
       </section>
 
-      {/* =================================================== portes d'entrée */}
+      {/* ========================================================== univers */}
       <section className={`${SHELL} pt-16 md:pt-20`}>
-        <Reveal className="mb-6 flex flex-wrap items-end justify-between gap-3" variant="blur">
+        <Reveal className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <span className={EYEBROW}>Trouver vite</span>
-            <h2 className={`${H2} mt-2.5`}>Trouvez le style de chaque enfant</h2>
+            <span className={EYEBROW}>Nos univers</span>
+            <h2 className={`${H2} mt-2.5 text-balance`}>Trouvez le style de chaque enfant</h2>
           </div>
-          <Link href="/boutique" className="group text-sm font-semibold text-rose">
-            Tout le catalogue
-            <span className="ml-1.5 inline-block transition-transform duration-300 ease-soft group-hover:translate-x-1">
-              →
-            </span>
+          <Link
+            href="/boutique"
+            className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold transition-colors duration-300 ease-soft hover:text-rose"
+          >
+            Voir toute la boutique
+            <IconArrowUp className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </Link>
         </Reveal>
 
-        {/* Une grande tuile et quatre petites. Au doigt, la grande prend les
-            deux colonnes : réduite au quart de l'écran, sa photo ne montrait
-            plus rien. */}
         <Reveal
-          className="grid auto-rows-[168px] grid-cols-2 gap-3.5 sm:auto-rows-[200px] lg:auto-rows-[215px] lg:grid-cols-4"
+          className="grid auto-rows-[180px] grid-cols-2 gap-3 sm:auto-rows-[220px] sm:gap-4 lg:grid-cols-4"
           stagger={110}
         >
-          {PORTES.map((p, i) => (
+          {TUILES_UNIVERS.map((tuile) => (
             <Link
-              key={p.t}
-              href={p.href}
-              className={`group relative overflow-hidden rounded-[24px] ${
-                i === 0 ? "col-span-2 row-span-2" : "col-span-1 row-span-1"
-              }`}
+              key={tuile.slug}
+              href={tuile.href}
+              className={`group relative overflow-hidden rounded-3xl bg-stone shadow-[0_18px_40px_-28px_rgba(36,26,32,.45)] ${tuile.className}`}
             >
-              <div
-                className="absolute inset-0 bg-cover transition-transform duration-[1100ms] ease-soft group-hover:scale-107"
-                style={{ backgroundImage: `url(${p.src})`, backgroundPosition: p.pos }}
-              />
-              {/* Deux voiles : l'un pose le texte, l'autre teinte la photo de
-                  la couleur de la maison au survol. */}
-              <div className="absolute inset-0 bg-linear-to-t from-ink/85 via-ink/25 to-transparent" />
-              <div className="absolute inset-0 bg-rose/0 transition-colors duration-500 ease-soft group-hover:bg-rose/15" />
+              <div className="absolute inset-0 overflow-hidden">
+                <Image
+                  src={tuile.image}
+                  alt={tuile.label}
+                  fill
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  className="object-cover transition-transform duration-[1100ms] ease-soft group-hover:scale-105"
+                />
+              </div>
+              <div className="absolute inset-0 bg-linear-to-t from-ink/70 via-ink/10 to-transparent" />
 
-              <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                <div className="text-[12px] font-bold uppercase tracking-[.1em] text-white/70">
-                  {p.s}
-                </div>
-                <div className="mt-1 flex items-end justify-between gap-3">
-                  <div
-                    className={`font-extrabold tracking-tight ${
-                      i === 0 ? "text-[clamp(1.8rem,3.6vw,2.6rem)]" : "text-xl"
-                    }`}
-                  >
-                    {p.t}
-                  </div>
-                  {/* La pastille arrive de la gauche au survol — rien au doigt,
-                      où le lien tout entier est déjà la cible. */}
-                  <span className="mb-1 grid h-9 w-9 shrink-0 -translate-x-2 place-items-center rounded-full bg-white text-ink opacity-0 transition-all duration-400 ease-back group-hover:translate-x-0 group-hover:opacity-100">
+              <div className="absolute inset-0 flex flex-col justify-end p-5">
+                <p className="text-xs text-white/80">{tuile.caption}</p>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                    {tuile.label}
+                  </h3>
+                  <span className="grid h-9 w-9 shrink-0 -translate-x-2 place-items-center rounded-full bg-white text-ink opacity-0 transition-all duration-400 ease-soft group-hover:translate-x-0 group-hover:opacity-100">
                     <IconArrowUp className="h-4 w-4" />
                   </span>
                 </div>
@@ -417,10 +351,10 @@ export function Home() {
       </section>
 
       {/* ============================================================ promo */}
-      {/* Bande pleine largeur, trois plans à trois vitesses : la photo traîne
-          derrière le défilement, le mot géant part à contresens, le texte ne
-          bouge pas. C'est cet écart, et lui seul, qui creuse la profondeur —
-          un fond qui glisse d'un bloc ne se voit même pas.
+      {/* Bande pleine largeur, deux plans à deux vitesses : la photo traîne
+          derrière le défilement, le texte ne bouge pas. C'est cet écart qui
+          creuse la profondeur — un fond qui glisse d'un bloc ne se voit même
+          pas.
           La photo est affichée telle quelle : ni aplat sombre, ni voile, ni
           grain. La bande reste basse, à la hauteur d'un bandeau. */}
       <section className="relative isolate mt-16 overflow-hidden text-white md:mt-20">
@@ -437,32 +371,6 @@ export function Home() {
             sizes="100vw"
             className="object-cover object-[50%_38%]"
           />
-        </ParallaxFond>
-
-        {/* Le mot qui traverse. Piste doublée, translatée de moitié : reprendre
-            `.marquee` à la main plutôt que le composant, dont le petit cœur de
-            séparation n'a pas de sens à cette taille de lettre. */}
-        <ParallaxFond
-          vitesse={-0.16}
-          marge={0.22}
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-        >
-          <div aria-hidden className="flex h-full items-center">
-            <div
-              className="marquee text-[clamp(3.2rem,10vw,8.5rem)] font-extrabold uppercase leading-none tracking-[-.045em] text-white/[.07]"
-              style={{ "--dur": "58s" } as React.CSSProperties}
-            >
-              {[0, 1].map((passe) => (
-                <div key={passe} className="flex shrink-0">
-                  {RUBAN.map((mot, i) => (
-                    <span key={i} className="whitespace-nowrap px-8">
-                      {mot}
-                    </span>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
         </ParallaxFond>
 
         <Reveal className={`${SHELL} relative py-7 text-center md:py-8`} variant="blur">
@@ -546,59 +454,6 @@ export function Home() {
         </Reveal>
       </section>
 
-      {/* ========================================================== univers */}
-      <section className={`${SHELL} pt-16 md:pt-20`}>
-        <Reveal className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <span className={EYEBROW}>Nos univers</span>
-            <h2 className={`${H2} mt-2.5 text-balance`}>Trouvez le style de chaque enfant</h2>
-          </div>
-          <Link
-            href="/boutique"
-            className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold transition-colors duration-300 ease-soft hover:text-rose"
-          >
-            Voir toute la boutique
-            <IconArrowUp className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-          </Link>
-        </Reveal>
-
-        <Reveal
-          className="grid auto-rows-[180px] grid-cols-2 gap-3 sm:auto-rows-[220px] sm:gap-4 lg:grid-cols-4"
-          stagger={110}
-        >
-          {TUILES_UNIVERS.map((tuile) => (
-            <Link
-              key={tuile.slug}
-              href={tuile.href}
-              className={`group relative overflow-hidden rounded-3xl bg-stone shadow-[0_18px_40px_-28px_rgba(36,26,32,.45)] ${tuile.className}`}
-            >
-              <div className="absolute inset-0 overflow-hidden">
-                <Image
-                  src={tuile.image}
-                  alt={tuile.label}
-                  fill
-                  sizes="(max-width: 1024px) 50vw, 25vw"
-                  className="object-cover transition-transform duration-[1100ms] ease-soft group-hover:scale-105"
-                />
-              </div>
-              <div className="absolute inset-0 bg-linear-to-t from-ink/70 via-ink/10 to-transparent" />
-
-              <div className="absolute inset-0 flex flex-col justify-end p-5">
-                <p className="text-xs text-white/80">{tuile.caption}</p>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-                    {tuile.label}
-                  </h3>
-                  <span className="grid h-9 w-9 shrink-0 -translate-x-2 place-items-center rounded-full bg-white text-ink opacity-0 transition-all duration-400 ease-soft group-hover:translate-x-0 group-hover:opacity-100">
-                    <IconArrowUp className="h-4 w-4" />
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </Reveal>
-      </section>
-
       {/* ============================================================= avis */}
       <section className={`${SHELL} pt-16 md:pt-20`}>
         <Reveal className="mb-7 text-center">
@@ -654,56 +509,53 @@ export function Home() {
       </section>
 
       {/* ================================================== nous contacter */}
-      <Reveal className={`${SHELL} pt-16 md:pt-20`} variant="scale">
-        <div className="noise relative overflow-hidden rounded-[26px] bg-ink px-6 py-16 text-center text-white md:rounded-[34px] md:py-20">
-          <div aria-hidden className="pointer-events-none absolute inset-0">
-            <div className="aurora absolute -left-20 top-0 h-80 w-80 rounded-full bg-rose/40 blur-[90px]" />
-            <div className="aurora absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-gold/30 blur-[90px] [animation-delay:-11s]" />
-          </div>
+      {/* Le trait qui sépare les avis du contact s'éteint avant les marges :
+          un filet d'un bord à l'autre couperait la page en deux, alors qu'on
+          veut seulement marquer un changement de sujet. */}
+      <div className={`${SHELL} pt-16 md:pt-20`}>
+        <div
+          aria-hidden
+          className="h-0.5 rounded-full bg-linear-to-r from-transparent via-rose/45 to-transparent"
+        />
+      </div>
 
-          <div className="relative">
-            <span className="text-[11px] font-bold uppercase tracking-[.16em] text-gold">
-              Une question ?
-            </span>
-            <h2 className="mx-auto mt-4 max-w-[16ch] text-[clamp(2.1rem,6vw,3.4rem)] font-extrabold leading-[1.04] tracking-[-.038em] text-balance">
-              Nous contacter
-            </h2>
-            <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-white/70 text-pretty">
-              Une taille, une commande en cours, une pièce que vous cherchez : écrivez sur WhatsApp
-              ou par courriel, une vraie personne répond.
-            </p>
+      {/* Posé à même la page : ni panneau, ni aplat sombre. Les deux entrées
+          sont les seuls objets dessinés, la lecture va droit au numéro. */}
+      <Reveal className={`${SHELL} pt-16 text-center md:pt-20`} variant="scale">
+        <span className={EYEBROW}>Une question ?</span>
+        <h2 className={`${H2} mx-auto mt-2.5 text-balance`}>Nous contacter</h2>
+        <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-muted text-pretty">
+          Une taille, une commande en cours, une pièce que vous cherchez : écrivez sur WhatsApp
+          ou par courriel, une vraie personne répond.
+        </p>
 
-            {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
-                où la cliente a déjà l'habitude d'écrire. */}
-            <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">
-              {CONTACT.map((c) => (
-                <a
-                  key={c.canal}
-                  href={c.href}
-                  {...(c.externe ? { target: "_blank", rel: "noreferrer" } : null)}
-                  className="flex items-center gap-4 rounded-[22px] border border-white/15 bg-white/5 p-5 text-left transition-all duration-400 ease-soft hover:-translate-y-1 hover:border-white/35 hover:bg-white/10"
-                >
-                  <span
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.pastille}`}
-                  >
-                    <c.Icone className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-white/50">
-                      {c.canal}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[14.5px] font-semibold">{c.valeur}</span>
-                    <span className="block text-xs text-white/50">{c.delai}</span>
-                  </span>
-                </a>
-              ))}
-            </div>
-
-            <p className="mt-6 text-[13px] text-white/50">
-              Lundi au samedi, 9 h – 19 h · Dakar, Sénégal
-            </p>
-          </div>
+        {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
+            où la cliente a déjà l'habitude d'écrire. */}
+        <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">
+          {CONTACT.map((c) => (
+            <a
+              key={c.canal}
+              href={c.href}
+              {...(c.externe ? { target: "_blank", rel: "noreferrer" } : null)}
+              className="flex items-center gap-4 rounded-[22px] border border-line bg-cream p-5 text-left transition-all duration-400 ease-soft hover:-translate-y-1 hover:border-rose/40 hover:bg-white"
+            >
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.pastille}`}
+              >
+                <c.Icone className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-muted">
+                  {c.canal}
+                </span>
+                <span className="mt-0.5 block truncate text-[14.5px] font-semibold">{c.valeur}</span>
+                <span className="block text-xs text-muted">{c.delai}</span>
+              </span>
+            </a>
+          ))}
         </div>
+
+        <p className="mt-6 text-[13px] text-muted">Lundi au samedi, 9 h – 19 h · Dakar, Sénégal</p>
       </Reveal>
 
       <QuickView product={quick} onClose={() => setQuick(null)} />
