@@ -6,7 +6,7 @@ import Link from "next/link";
 import { CountUp, Magnetic, SplitText, useSpotlight } from "./motion";
 import { IconArrow, IconWhatsApp } from "./icons";
 import { formatXOF, waLink } from "@/lib/format";
-import { HERO_VIDEOS, HERO_VIGNETTES, byId } from "@/lib/products";
+import { HERO_VIDEOS, HERO_VIGNETTES, PRODUCTS } from "@/lib/products";
 
 /* ------------------------------------------------------------------ la parole
    Tout le texte du bandeau tient ici : la pastille, trois lignes de titre dont
@@ -35,7 +35,21 @@ export function Hero() {
   const [actif, setActif] = useState(0);
   const [pause, setPause] = useState(false);
 
-  const vedette = byId(HERO_VIDEOS[actif].piece);
+  /* La carte flottante fait défiler tout le catalogue, une pièce à la fois,
+     sans se caler sur la vidéo : les deux rythmes se superposent au lieu de se
+     répéter. Elle s'arrête au survol et au focus — sinon la pièce change entre
+     le moment où on la vise et celui où on clique, et le lien mène ailleurs. */
+  const [piece, setPiece] = useState(0);
+  const [pieceFigee, setPieceFigee] = useState(false);
+
+  useEffect(() => {
+    if (pieceFigee) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const t = window.setInterval(() => setPiece((p) => (p + 1) % PRODUCTS.length), 3400);
+    return () => window.clearInterval(t);
+  }, [pieceFigee]);
+
+  const vedette = PRODUCTS[piece];
 
   /* L'inclinaison est portée par un calque au-dessus de l'arche : posée sur
      l'arche elle-même, elle se battrait avec l'animation d'entrée, qui écrit
@@ -281,9 +295,15 @@ export function Hero() {
               </span>
             </div>
 
-            {/* La pièce du catalogue la plus proche de ce qui est porté. */}
+            {/* Le catalogue qui passe, une pièce à la fois. */}
             {vedette && (
-              <div className="anim-float absolute -left-3 bottom-6 z-20 hidden sm:block lg:-left-16 lg:bottom-10">
+              <div
+                className="anim-float absolute -left-3 bottom-6 z-20 hidden sm:block lg:-left-16 lg:bottom-10"
+                onPointerEnter={() => setPieceFigee(true)}
+                onPointerLeave={() => setPieceFigee(false)}
+                onFocusCapture={() => setPieceFigee(true)}
+                onBlurCapture={() => setPieceFigee(false)}
+              >
                 <Link
                   key={vedette.id}
                   href={`/p/${vedette.slug}`}
@@ -294,7 +314,7 @@ export function Hero() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10px] font-bold uppercase tracking-[.14em] text-muted">
-                      Dans le même esprit
+                      Dans la boutique
                     </span>
                     <span className="mt-0.5 block truncate text-[13px] font-semibold">
                       {vedette.name}

@@ -695,7 +695,7 @@ export function ScrollProgress() {
   }, []);
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-transparent">
+    <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-transparent">
       <div ref={ref} className="progress h-full bg-linear-to-r from-rose to-gold" />
     </div>
   );
