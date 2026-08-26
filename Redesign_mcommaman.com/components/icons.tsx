@@ -64,6 +64,47 @@ export function IconHeartFull({ className = "h-3 w-3" }: Props) {
   );
 }
 
+/** Colis, pour l'accès aux commandes depuis la barre du haut. */
+export function IconPackage({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M20.5 7.5v9l-8.5 4.5-8.5-4.5v-9L12 3z" />
+      <path d="m3.7 7.8 8.3 4.4 8.3-4.4" />
+      <path d="M12 12.2V21" />
+    </Svg>
+  );
+}
+
+/** Buste, pour le compte client. */
+export function IconUser({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20.2a7.6 7.6 0 0 1 14.4 0" />
+    </Svg>
+  );
+}
+
+/** Haut-parleur, son coupé : la barre traverse le cône. */
+export function IconMuet({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M11 5.5 6.8 9H4.2a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2.6L11 18.5z" />
+      <path d="m16.5 10 4 4M20.5 10l-4 4" />
+    </Svg>
+  );
+}
+
+/** Haut-parleur, son actif : deux ondes à droite du cône. */
+export function IconSon({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <path d="M11 5.5 6.8 9H4.2a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2.6L11 18.5z" />
+      <path d="M15 9.5a3.6 3.6 0 0 1 0 5M17.8 7.2a7.2 7.2 0 0 1 0 9.6" />
+    </Svg>
+  );
+}
+
 export function IconMenu({ className }: Props) {
   return (
     <Svg className={className}>

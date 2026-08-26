@@ -25,6 +25,7 @@ import {
   IconSmile,
   IconWhatsApp,
 } from "./icons";
+import { EnMouvement } from "./en-mouvement";
 import { QuickView } from "./quick-view";
 import { Countdown } from "./countdown";
 import { waLink } from "@/lib/format";
@@ -88,7 +89,9 @@ const TUILES_UNIVERS = [
     slug: "accessoires",
     label: "Accessoires",
     caption: "Les petits plus",
-    image: "/images/univers/Ensembleenfant-194-retouche.png",
+    /* La tuile montrait un jean cargo, repris tel quel de boty. Un sac à dos
+       dit au moins ce que le rayon contient. */
+    image: "/images/univers/sac-dos.png",
     /* Pas de rayon « Accessoires » dans ce catalogue : la tuile ouvre la
        boutique entière plutôt qu'un filtre qui ne renverrait rien. */
     href: "/boutique",
@@ -350,6 +353,21 @@ export function Home() {
         </div>
       </section>
 
+      {/* ==================================================== en mouvement */}
+      {/* Une bande de séquences verticales sous le rail de pièces : la photo dit
+          la coupe, la vidéo dit la tombée. Les tuiles ne jouent que ce qui est
+          à l'écran, et le son ne part qu'à la demande. */}
+      <section className={`${SHELL} pt-16 md:pt-20`}>
+        <Reveal className="mb-9">
+          <span className={EYEBROW}>En mouvement</span>
+          <h2 className={`${H2} mt-2.5 text-balance`}>Nos pièces, filmées</h2>
+        </Reveal>
+
+        <Reveal variant="scale">
+          <EnMouvement />
+        </Reveal>
+      </section>
+
       {/* ============================================================ promo */}
       {/* Bande pleine largeur, deux plans à deux vitesses : la photo traîne
           derrière le défilement, le texte ne bouge pas. C'est cet écart qui
@@ -412,19 +430,24 @@ export function Home() {
       <section className={`${SHELL} pt-16 md:pt-20`}>
         <Reveal className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16" variant="blur">
           {/* Deux visuels décalés : le premier descend, la paire cesse d'être
-              un bloc et devient une composition. */}
+              un bloc et devient une composition. Des enfants habillés, pas des
+              vêtements sur cintre — la section raconte la maison, pas une
+              pièce du catalogue. Les deux photos sortent du même décor et de
+              la même lumière, sinon la paire se lit comme deux emprunts.
+              `pos` recadre : les tuiles sont hautes, l'une des photos est
+              large. */}
           <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
             {[
-              { f: "/images/products/Ensemble_enfant-26-net-retouche.png", décalage: "mt-8" },
-              { f: "/images/products/Ensemble_enfant-121-net-retouche.png", décalage: "" },
+              { f: "/images/portes/filles.webp", pos: "50% 30%", décalage: "mt-8" },
+              { f: "/images/portes/grands.webp", pos: "58% 28%", décalage: "" },
             ].map((v) => (
               <div
                 key={v.f}
                 className={`group relative aspect-3/4 overflow-hidden rounded-[24px] bg-stone ${v.décalage}`}
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[1100ms] ease-soft group-hover:scale-105"
-                  style={{ backgroundImage: `url(${v.f})` }}
+                  className="absolute inset-0 bg-cover transition-transform duration-[1100ms] ease-soft group-hover:scale-105"
+                  style={{ backgroundImage: `url(${v.f})`, backgroundPosition: v.pos }}
                 />
               </div>
             ))}
@@ -439,14 +462,16 @@ export function Home() {
               promesse.
             </p>
 
-            <div className="mt-7 grid gap-3.5 sm:grid-cols-2">
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 sm:gap-4">
               {PROMESSES.map(({ Icone, t, s }) => (
-                <div key={t} className="rounded-2xl bg-mist p-5">
-                  <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose/10 text-rose">
-                    <Icone />
+                <div key={t} className="flex items-center gap-3 rounded-2xl bg-mist p-3.5 sm:p-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose/10 text-rose">
+                    <Icone className="h-4 w-4" />
                   </span>
-                  <div className="text-[13.5px] font-bold">{t}</div>
-                  <div className="mt-0.5 text-[12.5px] leading-snug text-muted">{s}</div>
+                  <div>
+                    <div className="text-sm font-bold leading-tight sm:text-[15px]">{t}</div>
+                    <div className="mt-0.5 text-xs leading-snug text-muted">{s}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -524,11 +549,6 @@ export function Home() {
       <Reveal className={`${SHELL} pt-16 text-center md:pt-20`} variant="scale">
         <span className={EYEBROW}>Une question ?</span>
         <h2 className={`${H2} mx-auto mt-2.5 text-balance`}>Nous contacter</h2>
-        <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-muted text-pretty">
-          Une taille, une commande en cours, une pièce que vous cherchez : écrivez sur WhatsApp
-          ou par courriel, une vraie personne répond.
-        </p>
-
         {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
             où la cliente a déjà l'habitude d'écrire. */}
         <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">

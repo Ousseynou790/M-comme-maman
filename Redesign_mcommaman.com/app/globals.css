@@ -186,6 +186,30 @@ body {
 .rail.dragging { cursor: grabbing; scroll-snap-type: none; }
 .rail.dragging * { pointer-events: none; }
 
+/* Bande de séquences filmées : un rail au doigt, une grille décalée à partir
+   du grand écran. Écrite ici et non en utilitaires parce que `.rail` est hors
+   couche et écraserait un `lg:grid`. */
+.bande {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.bande::-webkit-scrollbar { display: none; }
+.bande > * { flex: none; scroll-snap-align: start; }
+
+@media (min-width: 1024px) {
+  .bande {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25rem;
+    overflow: visible;
+  }
+  .bande > * { width: auto; }
+}
+
 /* En boucle, l'aimantation se battrait avec le défilement automatique. */
 .rail-auto { scroll-snap-type: none; }
 

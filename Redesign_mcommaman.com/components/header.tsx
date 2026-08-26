@@ -9,22 +9,37 @@ import { formatXOF } from "@/lib/format";
 import { ScrollProgress } from "./motion";
 import { useCart } from "./cart-context";
 import { SearchOverlay } from "./search-overlay";
-import { IconArrow, IconBag, IconChevron, IconClose, IconMenu, IconSearch } from "./icons";
+import {
+  IconArrow,
+  IconBag,
+  IconChevron,
+  IconClose,
+  IconHeart,
+  IconMenu,
+  IconPackage,
+  IconSearch,
+  IconUser,
+} from "./icons";
 
-/* Le bandeau dit trois choses, une à la fois : entassées sur une ligne, aucune
-   n'est lue. */
-const ANNONCES = [
-  "Livraison offerte à Dakar dès 25 000 F",
-  "Wave, Orange Money ou paiement à la livraison",
-  "Échange sous 7 jours si la taille ne va pas",
-];
+/* La barre est reprise de la maquette boty : le logo au tiers gauche, les
+   rayons au centre, les cinq actions à droite. À la place du bandeau
+   d'annonce, la jauge de lecture court sous la barre et se remplit au
+   défilement — elle sert aussi de trait de séparation. */
 
 const NAV = [
-  { href: "/boutique?g=fille", label: "Fille" },
-  { href: "/boutique?g=garcon", label: "Garçon" },
-  { href: "/boutique?age=0-1", label: "Bébé" },
+  { href: "/boutique?g=fille", label: "Filles" },
+  { href: "/boutique?g=garcon", label: "Garçons" },
+  { href: "/boutique?age=0-1", label: "Bébés" },
   { href: "/boutique?cat=Chaussures", label: "Chaussures" },
   { href: "/contact", label: "Contact" },
+];
+
+/* Les trois raccourcis de compte de boty. Les pages n'existent pas encore de
+   ce côté : les liens sont posés, elles suivront. */
+const COMPTE = [
+  { href: "/favoris", label: "Mes favoris", Icone: IconHeart },
+  { href: "/commandes", label: "Mes commandes", Icone: IconPackage },
+  { href: "/compte/connexion", label: "Se connecter", Icone: IconUser },
 ];
 
 const AGES = [
@@ -41,7 +56,6 @@ export function Header() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [annonce, setAnnonce] = useState(0);
 
   /* Raccourcis : Ctrl/Cmd+K partout, « / » quand on n'est pas en train d'écrire. */
   useEffect(() => {
@@ -61,13 +75,6 @@ export function Header() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /* Le premier rendu affiche toujours la première annonce : serveur et client
-     partent du même texte, la rotation ne commence qu'après. */
-  useEffect(() => {
-    const t = window.setInterval(() => setAnnonce((a) => (a + 1) % ANNONCES.length), 4600);
-    return () => window.clearInterval(t);
-  }, []);
-
   /* Changer de page referme le menu — sinon il reste ouvert par-dessus. */
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -81,17 +88,17 @@ export function Header() {
 
   return (
     <>
-      {/* Bandeau et barre restent solidaires en haut de l'écran au défilement. */}
+      {/* La barre reste en haut de l'écran au défilement. */}
       <header className="sticky top-0 z-50">
-        <div className="overflow-hidden bg-ink px-4 py-2.5 text-center text-[11.5px] text-white/90 sm:text-xs">
-          <span key={annonce} className="anim-tick inline-block">
-            {ANNONCES[annonce]}
-          </span>
-        </div>
+        {/* La jauge de lecture ferme le haut de la barre : posée dessous, elle
+            se confondait avec la bordure. */}
+        <ScrollProgress />
 
-        <div className="border-b border-line bg-cream/92 backdrop-blur-md">
-          <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-10">
-            <div className="relative flex h-16 items-center justify-between gap-3 lg:grid lg:h-[4.75rem] lg:grid-cols-[auto_1fr_auto] lg:gap-8">
+        <div className="border-b border-line bg-white shadow-[0_1px_12px_rgba(36,26,32,.04)]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {/* La colonne du logo est figée à 132 px comme chez boty : au-delà,
+                elle poussait les rayons contre le champ de recherche. */}
+            <div className="relative flex h-16 items-center justify-between gap-4 lg:grid lg:h-[4.75rem] lg:grid-cols-[132px_1fr_auto] lg:gap-x-8">
               {/* ------------------------------------------- menu au doigt */}
               <button
                 type="button"
@@ -220,7 +227,7 @@ export function Header() {
               </nav>
 
               {/* -------------------------------------- actions, à droite */}
-              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 lg:justify-self-end">
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
@@ -239,6 +246,30 @@ export function Header() {
                   <span>Rechercher</span>
                   <kbd className="rounded border border-line px-1.5 text-[10.5px] leading-4 text-muted">/</kbd>
                 </button>
+
+                {/* Favoris, commandes, compte : les trois raccourcis de boty,
+                    cachés au doigt où la place manque. */}
+                <Link
+                  href="/favoris"
+                  aria-label="Favoris"
+                  className="hidden h-11 w-11 place-items-center text-ink/70 transition-colors hover:text-rose sm:grid"
+                >
+                  <IconHeart />
+                </Link>
+                <Link
+                  href="/commandes"
+                  aria-label="Mes commandes"
+                  className="hidden h-11 w-11 place-items-center text-ink/70 transition-colors hover:text-rose sm:grid"
+                >
+                  <IconPackage />
+                </Link>
+                <Link
+                  href="/compte/connexion"
+                  aria-label="Se connecter"
+                  className="hidden h-11 w-11 place-items-center text-ink/70 transition-colors hover:text-rose sm:grid"
+                >
+                  <IconUser />
+                </Link>
 
                 <button
                   type="button"
@@ -281,7 +312,7 @@ export function Header() {
                     {n.label}
                   </Link>
                 ))}
-                <div className="mt-2 flex flex-wrap gap-2 border-t border-line pt-4 pb-2">
+                <div className="mt-2 flex flex-wrap gap-2 border-t border-line pt-4">
                   {CATEGORIES.map((c) => (
                     <Link
                       key={c}
@@ -292,12 +323,26 @@ export function Header() {
                     </Link>
                   ))}
                 </div>
+
+                {/* Les mêmes raccourcis qu'à droite de la barre, qui n'y tiennent
+                    pas au doigt. */}
+                <div className="mt-2 flex flex-col border-t border-line pt-2">
+                  {COMPTE.map(({ href, label, Icone }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="flex items-center gap-2.5 py-3 text-[15px] font-medium text-ink/80 transition-colors hover:text-rose"
+                    >
+                      <Icone className="h-4 w-4" />
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <ScrollProgress />
       </header>
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
