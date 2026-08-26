@@ -26,6 +26,8 @@ import {
   IconWhatsApp,
 } from "./icons";
 import { QuickView } from "./quick-view";
+import { useReviews } from "./reviews-context";
+import { StarRow } from "./review-form";
 import { Countdown } from "./countdown";
 import { waLink } from "@/lib/format";
 import { PRODUCTS, PROMO_END, type Product } from "@/lib/products";
@@ -112,9 +114,9 @@ const PROMESSES = [
   { Icone: IconSmile, t: "Choisis avec amour", s: "Chaque pièce est sélectionnée par notre équipe de mamans." },
 ];
 
-/* Le mot des mamans, repris de la maquette boty : trois avis choisis parmi
-   ceux de la boutique, la note et la référence de commande qui les rend
-   vérifiables. Avis fictifs en attendant qu'ils remontent du back-office. */
+/* Le mot des mamans : trois avis, la note et la référence de commande qui les
+   rendent vérifiables. Ceux-ci ne servent que tant qu'aucune cliente n'a écrit ;
+   dès le premier avis déposé sur /avis, ce sont les vrais qui s'affichent. */
 const REVIEWS = [
   {
     stars: 5,
@@ -135,22 +137,6 @@ const REVIEWS = [
     text: "Babies très jolies et solides. Ma pointure manquait, mais on m'a prévenue du réassort sur WhatsApp et je l'ai eue trois jours après.",
   },
 ];
-
-/* Les étoiles restent des glyphes : le projet n'embarque aucune bibliothèque
-   d'icônes tierce, et un ★ garde la même graisse partout. */
-function Etoiles({ note }: { note: number }) {
-  const pleines = Math.round(note);
-  return (
-    <span
-      role="img"
-      aria-label={`Noté ${String(note).replace(".", ",")} sur 5`}
-      className="shrink-0 text-[15px] leading-none tracking-[2px] text-gold"
-    >
-      {"★".repeat(pleines)}
-      <span className="text-gold/25">{"★".repeat(5 - pleines)}</span>
-    </span>
-  );
-}
 
 /* Les deux façons d'atteindre la boutique. Le numéro est celui de `WHATSAPP`,
    écrit ici en clair parce qu'il s'affiche autant qu'il sert de lien. */
@@ -194,6 +180,23 @@ const EYEBROW = "text-[11px] font-bold uppercase tracking-[.16em] text-rose";
 export function Home() {
   const [tab, setTab] = useState("tous");
   const [quick, setQuick] = useState<Product | null>(null);
+
+  /* Les avis déposés par les clientes prennent la place des exemples dès qu'il
+     y en a un. Avant l'hydratation la liste est vide : le premier rendu reste
+     donc identique côté serveur et client. */
+  const { shopReviews, aggregate, hydrated } = useReviews();
+  const deposes = shopReviews();
+  const noteBoutique = aggregate({ kind: "shop" });
+  const avisReels = hydrated && deposes.length > 0;
+  const avis = avisReels
+    ? deposes.slice(0, 3).map((a) => ({
+        cle: a.id,
+        stars: a.rating,
+        who: a.authorName,
+        ref: a.orderRef,
+        text: a.comment,
+      }))
+    : REVIEWS.map((r) => ({ cle: r.ref, ...r }));
 
   /* Pastille glissante sous l'onglet actif : on mesure le bouton, on déplace la pastille. */
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -460,8 +463,17 @@ export function Home() {
           <span className={EYEBROW}>Elles nous font confiance</span>
           <h2 className={`${H2} mt-2.5 text-balance`}>Le mot des mamans</h2>
           <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-muted">
-            <Etoiles note={4.9} />
-            4,9/5 sur <CountUp to={126} /> avis
+            {avisReels ? (
+              <>
+                <StarRow rating={noteBoutique.average} />
+                {String(noteBoutique.average).replace(".", ",")}/5 sur {noteBoutique.count} avis
+              </>
+            ) : (
+              <>
+                <StarRow rating={4.9} />
+                4,9/5 sur <CountUp to={126} /> avis
+              </>
+            )}
           </p>
         </Reveal>
 
@@ -469,16 +481,16 @@ export function Home() {
             citation au milieu, la cliente en pied derrière un filet. Sous
             `sm`, elles s'empilent — un avis coupé ne se lit pas. */}
         <Reveal className="grid grid-cols-1 gap-4 sm:grid-cols-3" stagger={90}>
-          {REVIEWS.map((r) => (
+          {avis.map((r) => (
             <article
-              key={r.ref}
+              key={r.cle}
               className="flex min-h-[210px] flex-col rounded-[22px] bg-mist p-6 transition-transform duration-400 ease-soft hover:-translate-y-1"
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-soft">
                   <IconQuote className="h-4 w-4 text-rose" />
                 </span>
-                <Etoiles note={r.stars} />
+                <StarRow rating={r.stars} />
               </div>
 
               <p className="flex-1 text-[14.5px] leading-[1.65] text-[#3d2f35] text-pretty">
@@ -493,18 +505,15 @@ export function Home() {
           ))}
         </Reveal>
 
-        {/* Pas de page « tous les avis » ici : le dépôt passe par WhatsApp,
-            comme le reste de la relation client. */}
+        {/* Le dépôt se fait sur /avis, réservé aux commandes reçues. */}
         <div className="mt-7 text-center">
-          <a
-            href={waLink("Bonjour, j'ai reçu ma commande et je voudrais laisser un avis")}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/avis"
             className="group inline-flex items-center gap-2 rounded-full border-[1.5px] border-[#e5d9de] bg-white px-6 py-3.5 text-sm font-semibold transition-colors duration-300 hover:border-rose hover:text-rose"
           >
-            Donner mon avis
+            {avisReels ? "Lire tous les avis" : "Donner mon avis"}
             <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
-          </a>
+          </Link>
         </div>
       </section>
 

@@ -3,6 +3,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-context";
 import { CartProvider } from "@/components/cart-context";
 import { OrdersProvider } from "@/components/orders-context";
+import { ReviewsProvider } from "@/components/reviews-context";
+import { FavoritesProvider } from "@/components/favorites-context";
 
 export const metadata: Metadata = {
   title: {
@@ -32,7 +34,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased">
         <AuthProvider>
           <OrdersProvider>
-            <CartProvider>{children}</CartProvider>
+            <ReviewsProvider>
+              <FavoritesProvider>
+                <CartProvider>{children}</CartProvider>
+              </FavoritesProvider>
+            </ReviewsProvider>
           </OrdersProvider>
         </AuthProvider>
       </body>

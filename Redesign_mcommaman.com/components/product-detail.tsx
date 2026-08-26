@@ -6,9 +6,13 @@ import { formatXOF, waLink } from "@/lib/format";
 import { COLORS, SIZES, PRODUCTS, type Product } from "@/lib/products";
 import { ProductCard } from "./product-card";
 import { useCart } from "./cart-context";
+import { useReviews } from "./reviews-context";
+import { FavoriteButton } from "./favorite-button";
+import { ReviewForm, ReviewList, StarRow } from "./review-form";
 
 export function ProductDetail({ product }: { product: Product }) {
   const { add } = useCart();
+  const { productReviews, aggregate, hydrated } = useReviews();
   const [color, setColor] = useState(0);
   const [size, setSize] = useState(2);
   const [openBlock, setOpenBlock] = useState(0);
@@ -37,6 +41,11 @@ export function ProductDetail({ product }: { product: Product }) {
     : null;
 
   const recos = PRODUCTS.filter((p) => p.id !== product.id).slice(0, 4);
+
+  /* La note vient des avis déposés, plus d’un chiffre écrit dans la page :
+     tant que personne n’a écrit, l’article l’annonce au lieu d’inventer. */
+  const avis = productReviews(product.id);
+  const note = aggregate({ kind: "product", productId: product.id });
 
   return (
     <div className="mx-auto max-w-[1400px] px-10 pb-20 pt-7">
@@ -77,8 +86,18 @@ export function ProductDetail({ product }: { product: Product }) {
           </h1>
 
           <div className="mt-3 flex items-center gap-2.5">
-            <span className="text-sm tracking-[2px] text-gold">★★★★★</span>
-            <span className="text-[13px] text-muted">4,8 · 12 avis</span>
+            {note.count > 0 ? (
+              <>
+                <StarRow rating={note.average} />
+                <a href="#avis" className="text-[13px] text-muted transition-colors hover:text-rose">
+                  {String(note.average).replace(".", ",")} · {note.count} avis
+                </a>
+              </>
+            ) : (
+              <a href="#avis" className="text-[13px] text-muted transition-colors hover:text-rose">
+                Aucun avis pour le moment
+              </a>
+            )}
           </div>
 
           <div className="mt-5 flex items-baseline gap-3">
@@ -158,6 +177,13 @@ export function ProductDetail({ product }: { product: Product }) {
             >
               WhatsApp
             </a>
+            <FavoriteButton
+              productId={product.id}
+              productName={product.name}
+              size="lg"
+              variant="contour"
+              className="shrink-0"
+            />
           </div>
 
           <div className="mt-5 flex gap-5 text-[12.5px] text-muted">
@@ -193,6 +219,33 @@ export function ProductDetail({ product }: { product: Product }) {
           ))}
         </div>
       </div>
+
+      {/* Les avis ferment la fiche, sous les recommandations : c’est là que la
+          page d’avis renvoie les clientes. */}
+      <section id="avis" className="scroll-mt-28 pt-17">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-[32px] font-extrabold tracking-[-.03em]">Avis sur cet article</h2>
+          {note.count > 0 && (
+            <span className="flex items-center gap-2.5 text-[13.5px] text-muted">
+              <StarRow rating={note.average} />
+              {String(note.average).replace(".", ",")}/5 · {note.count} avis
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[1.35fr_.95fr] items-start gap-14">
+          {/* Avant l’hydratation on ne sait pas encore ce qui existe. */}
+          <div>{hydrated && <ReviewList reviews={avis} />}</div>
+
+          <div className="rounded-3xl border border-line bg-mist p-6">
+            <h3 className="text-[15px] font-bold">Vous l’avez reçu&nbsp;?</h3>
+            <p className="mb-5 mt-1.5 text-[13px] leading-relaxed text-muted">
+              La taille, la matière, la tenue au lavage : ce qui aide la prochaine maman à choisir.
+            </p>
+            <ReviewForm target={{ kind: "product", productId: product.id }} titre="Votre note" />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -9,12 +9,14 @@ import { formatXOF } from "@/lib/format";
 import { ScrollProgress } from "./motion";
 import { useAuth } from "./auth-context";
 import { useCart } from "./cart-context";
+import { useFavorites } from "./favorites-context";
 import { SearchOverlay } from "./search-overlay";
 import {
   IconArrow,
   IconBag,
   IconChevron,
   IconClose,
+  IconHeart,
   IconMenu,
   IconPackage,
   IconSearch,
@@ -34,6 +36,7 @@ const NAV = [
   { href: "/boutique?g=garcon", label: "Garçon" },
   { href: "/boutique?age=0-1", label: "Bébé" },
   { href: "/boutique?cat=Chaussures", label: "Chaussures" },
+  { href: "/avis", label: "Avis" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -49,6 +52,7 @@ const COUP_DE_COEUR = "p8";
 export function Header() {
   const { count, pulse, openDrawer } = useCart();
   const { account } = useAuth();
+  const { count: favoris } = useFavorites();
 
   /* Avant l'hydratation, `account` vaut `null` des deux côtés : le premier rendu
      montre l'icône neutre, les initiales prennent sa place ensuite. */
@@ -264,6 +268,22 @@ export function Header() {
                 </button>
 
                 <Link
+                  href="/favoris"
+                  aria-label={
+                    favoris > 0 ? `Mes favoris, ${favoris} article${favoris > 1 ? "s" : ""}` : "Mes favoris"
+                  }
+                  title="Mes favoris"
+                  className="relative grid h-11 w-11 place-items-center text-ink/75 transition-colors hover:text-rose"
+                >
+                  <IconHeart />
+                  {favoris > 0 && (
+                    <span className="anim-pop absolute right-1 top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose px-1 text-[10.5px] font-bold tabular-nums text-white">
+                      {favoris}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
                   href="/commandes"
                   aria-label="Mes commandes"
                   title="Suivre mes commandes"
@@ -309,7 +329,7 @@ export function Header() {
             {/* ------------------------------------------ menu au doigt, déplié */}
             <div
               className={`overflow-hidden transition-[max-height] duration-400 ease-soft lg:hidden ${
-                menuOpen ? "max-h-[32rem]" : "max-h-0"
+                menuOpen ? "max-h-[44rem]" : "max-h-0"
               }`}
             >
               <div className="flex flex-col border-t border-line py-2">
@@ -328,6 +348,13 @@ export function Header() {
                     {n.label}
                   </Link>
                 ))}
+                <Link
+                  href="/favoris"
+                  className="flex items-center gap-2 py-3 text-[15px] font-medium text-ink/80 transition-colors hover:text-rose"
+                >
+                  Mes favoris
+                  {favoris > 0 && <span className="text-[13px] text-muted">({favoris})</span>}
+                </Link>
                 <Link
                   href="/commandes"
                   className="py-3 text-[15px] font-medium text-ink/80 transition-colors hover:text-rose"

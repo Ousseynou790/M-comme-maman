@@ -4,13 +4,24 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatXOF, waLink } from "@/lib/format";
+import { byId, type Product } from "@/lib/products";
 import { zoneLabel } from "@/lib/livraison";
 import { useAuth } from "./auth-context";
 import { useCart } from "./cart-context";
 import { useOrders } from "./orders-context";
+import { useFavorites } from "./favorites-context";
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountNav } from "./account-nav";
-import { IconArrow, IconBag, IconLogout, IconPackage, IconPin, IconUser, IconWhatsApp } from "./icons";
+import {
+  IconArrow,
+  IconBag,
+  IconHeart,
+  IconLogout,
+  IconPackage,
+  IconPin,
+  IconUser,
+  IconWhatsApp,
+} from "./icons";
 
 const SHELL = "mx-auto w-full max-w-[1180px] px-5 md:px-8 lg:px-10";
 
@@ -32,6 +43,7 @@ export function AccountDashboard() {
   const { account, hydrated, logout } = useAuth();
   const { items, count, subtotal, optionLabel } = useCart();
   const { orders } = useOrders();
+  const { ids: favorisIds, count: favoris } = useFavorites();
 
   /* `sortie` évite un aller-retour : après « Se déconnecter », le compte
      disparaît et l'effet de garde renverrait vers la page de connexion avant
@@ -69,6 +81,13 @@ export function AccountDashboard() {
 
   const derniere = orders[0] ?? null;
 
+  /* Quatre pièces suffisent à reconnaître sa liste ; le reste est sur /favoris.
+     Un article retiré du catalogue est simplement sauté. */
+  const envies = favorisIds
+    .map((id) => byId(id))
+    .filter((p): p is Product => Boolean(p))
+    .slice(0, 4);
+
   const chiffres = [
     {
       valeur: String(orders.length),
@@ -81,6 +100,12 @@ export function AccountDashboard() {
       label: count > 1 ? "Articles au panier" : "Article au panier",
       href: "/panier",
       Icone: IconBag,
+    },
+    {
+      valeur: String(favoris),
+      label: favoris > 1 ? "Favoris" : "Favori",
+      href: "/favoris",
+      Icone: IconHeart,
     },
     {
       valeur: String(account.addresses.length),
@@ -123,7 +148,7 @@ export function AccountDashboard() {
             </button>
           </div>
 
-          <div className="mt-7 grid gap-px overflow-hidden rounded-2xl bg-white/15 sm:grid-cols-3">
+          <div className="mt-7 grid gap-px overflow-hidden rounded-2xl bg-white/15 sm:grid-cols-2 lg:grid-cols-4">
             {chiffres.map((c) => (
               <Link
                 key={c.label}
@@ -295,6 +320,65 @@ export function AccountDashboard() {
                 >
                   Voir la sélection
                 </Link>
+              </div>
+            )}
+          </section>
+
+          {/* ---------------------------------------------------- mes envies */}
+          <section className="rounded-3xl border border-line bg-white p-6 sm:p-7">
+            <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[.16em] text-rose">Sélection</p>
+                <h2 className="mt-1 text-base font-extrabold tracking-tight">Mes envies</h2>
+              </div>
+              {favoris > 0 && (
+                <Link
+                  href="/favoris"
+                  className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-muted transition-colors hover:text-rose"
+                >
+                  Tous mes favoris
+                  <IconArrow className="h-3.5 w-3.5 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
+                </Link>
+              )}
+            </header>
+
+            {envies.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+                  {envies.map((p) => (
+                    <Link key={p.id} href={`/p/${p.slug}`} className="group">
+                      <div className="aspect-3/4 overflow-hidden rounded-2xl bg-stone">
+                        <div
+                          className="h-full w-full bg-cover bg-center transition-transform duration-700 ease-soft group-hover:scale-105"
+                          style={{ backgroundImage: `url(${p.image})` }}
+                        />
+                      </div>
+                      <p className="mt-2 line-clamp-1 text-[12.5px] font-bold transition-colors group-hover:text-rose">
+                        {p.name}
+                      </p>
+                      <p className="mt-0.5 text-[12px] tabular-nums text-muted">
+                        {formatXOF(p.price)}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+
+                {favoris > envies.length && (
+                  <p className="mt-3.5 text-[12.5px] text-muted">
+                    et {favoris - envies.length} autre{favoris - envies.length > 1 ? "s" : ""} pièce
+                    {favoris - envies.length > 1 ? "s" : ""} mise
+                    {favoris - envies.length > 1 ? "s" : ""} de côté.
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-4 rounded-2xl bg-mist p-5">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-soft">
+                  <IconHeart className="h-4 w-4 text-rose" />
+                </span>
+                <p className="text-[13.5px] leading-relaxed text-muted">
+                  Touchez le cœur sur un article pour le retrouver ici.
+                </p>
               </div>
             )}
           </section>

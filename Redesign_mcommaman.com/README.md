@@ -25,21 +25,32 @@ npm run dev
 
 | Route | Fichier | Contenu |
 |---|---|---|
-| `/` | `app/page.tsx` → `components/home.tsx` | Bandeau d'accueil en arche (`components/hero.tsx`), bandeau défilant, réassurance, bento des âges, carrousel à onglets, compte à rebours, sélecteur d'univers en pile, histoire en défilement bloqué, paiements, trois avis en cartes, section « Nous contacter » |
+| `/` | `app/page.tsx` → `components/home.tsx` | Bandeau d'accueil en arche (`components/hero.tsx`), bandeau défilant, réassurance, bento des âges, carrousel à onglets, compte à rebours, sélecteur d'univers en pile, histoire en défilement bloqué, paiements, le mot des mamans, section « Nous contacter » |
 | `/boutique` | `app/boutique/page.tsx` → `components/catalogue.tsx` | Facettes catégorie / âge / genre, recherche `?q=`, 4 tris, aperçu rapide, pas de pagination |
-| `/p/[slug]` | `app/p/[slug]/page.tsx` | Galerie, variantes couleur / taille, accordéons, recommandations, JSON-LD Product |
+| `/p/[slug]` | `app/p/[slug]/page.tsx` | Galerie, variantes couleur / taille, accordéons, recommandations, avis de l'article, JSON-LD Product |
 | `/panier` | `app/panier/page.tsx` | Tunnel à l'étape 1 |
 | `/commande` | `app/commande/page.tsx` | Tunnel à l'étape 2 : livraison validée → paiement → commande enregistrée |
 | `/commandes` | `app/commandes/page.tsx` → `components/orders-list.tsx` | Historique et avancement de chaque colis |
 | `/commandes/[ref]` | `app/commandes/[ref]/page.tsx` → `components/order-detail.tsx` | Suivi détaillé, frise en quatre temps, recommander, annuler |
+| `/favoris` | `app/favoris/page.tsx` → `components/favorites-page.tsx` | Pièces mises de côté, tout ajouter au panier, vider la liste |
+| `/avis` | `app/avis/page.tsx` → `components/reviews-page.tsx` | Note moyenne, distribution, avis boutique et articles, dépôt réservé aux commandes reçues |
 | `/contact` | `app/contact/page.tsx` | Formulaire + coordonnées + WhatsApp |
-| `/compte` | `app/compte/page.tsx` → `components/account-dashboard.tsx` | Tableau de bord : panier en cours, adresse par défaut, informations, aide |
+| `/compte` | `app/compte/page.tsx` → `components/account-dashboard.tsx` | Tableau de bord : dernière commande, panier en cours, mes envies, adresse par défaut |
 | `/compte/connexion` | `app/compte/connexion/page.tsx` → `components/account-auth.tsx` | Connexion, redirection `?suite=` |
 | `/compte/inscription` | `app/compte/inscription/page.tsx` → `components/account-auth.tsx` | Création de compte, six règles de validation, jauge de mot de passe |
 | `/compte/profil` | `app/compte/profil/page.tsx` → `components/account-profile.tsx` | Informations, carnet d'adresses, tailles suivies, mot de passe, suppression |
 | `/infos/[slug]` | `app/infos/[slug]/page.tsx` | CGV, mentions légales, confidentialité, retours, livraison, FAQ |
-| `/admin` | `app/admin/page.tsx` | Commandes, produits, stock, promotions |
-| `/admin` → Produits → **Nouveau produit** | `components/product-form.tsx` | Création d'une fiche : identité, photos, prix, variantes, aperçu live |
+| `/admin/connexion` | `app/admin/connexion/page.tsx` | Entrée du back-office, identifiants de démonstration affichés |
+| `/admin` | `app/admin/(espace)/page.tsx` | Tableau de bord : huit tuiles de rubrique, chacune avec son chiffre |
+| `/admin/statistiques` | `app/admin/(espace)/statistiques/page.tsx` | Indicateurs comparés, ventes jour par jour, rayons, paiements, villes, fiches sans vente, journal |
+| `/admin/commandes` | `app/admin/(espace)/commandes/page.tsx` | Liste filtrable, détail en fenêtre, avancement du statut |
+| `/admin/produits` | `app/admin/(espace)/produits/page.tsx` | Catalogue, stock corrigé sur place, publier / dépublier / dupliquer / supprimer |
+| `/admin/produits/nouveau`, `/admin/produits/[id]` | `components/product-form.tsx` | Éditeur de fiche : identité, photothèque, prix, variantes, aperçu live, cinq conditions de publication |
+| `/admin/categories` | `app/admin/(espace)/categories/page.tsx` | Catégories, visuel, renvois symétriques, visibilité |
+| `/admin/promotions` | `app/admin/(espace)/promotions/page.tsx` | Campagnes en bons de réduction, onglets par statut, avancement, tiroir de saisie |
+| `/admin/clients` | `app/admin/(espace)/clients/page.tsx` | Fichier clientes, segments déduits, commandes de chacune |
+| `/admin/configuration` | `app/admin/(espace)/configuration/page.tsx` | Tailles, coloris, matières, photothèque |
+| `/admin/reglages` | `app/admin/(espace)/reglages/page.tsx` | Identité, livraison, bandeau, photos d'accueil, remise à zéro |
 | 404 | `app/not-found.tsx` | Page introuvable |
 
 ---
@@ -76,6 +87,26 @@ Livraison du tunnel se pré-remplit depuis l'adresse par défaut, et propose de 
 sinon. Les zones de livraison, partagées entre le tunnel et le carnet d'adresses, vivent dans
 **`lib/livraison.ts`**.
 
+### Favoris
+
+**`components/favorites-context.tsx`** tient la liste (clé `mcm-favoris-v1`) : le dernier cœur
+touché passe en tête, un écouteur `storage` reflète ce qui se fait dans un autre onglet. Le cœur
+lui-même est un seul composant, **`components/favorite-button.tsx`** — posé sur une carte, il
+intercepte le clic pour ne pas partir sur la fiche ; il se dessine vide tant que le stockage n'a
+pas été relu, sinon le premier rendu ne serait pas le même côté serveur et client.
+
+Le même cœur sert partout : carte de la boutique, aperçu rapide, fiche produit, et sur
+`/favoris` où il fait office de retrait. La page reprend les cartes de la boutique plutôt qu'un
+gabarit à part, ajoute une barre de tête (nombre d'articles, total, **Tout ajouter au panier**,
+**Vider la liste** en deux temps) et signale les identifiants qui ne correspondent plus à aucun
+article du catalogue au lieu de tomber dessus.
+
+**La liste ne suit pas le compte.** Ouverte sur un autre téléphone, elle est vide, même
+connectée. En ligne la table est courte — `(compte, produit, date)` avec une contrainte
+d'unicité — et la liste du navigateur doit se **fondre** dans celle du compte à la connexion :
+une cliente qui met des pièces de côté avant de créer son compte ne doit pas les perdre en le
+créant.
+
 ### Commandes et suivi
 
 **`components/orders-context.tsx`** enregistre la commande à la validation : référence
@@ -100,9 +131,92 @@ back-office qui le pilotera. En ligne, il faudra aussi : commande écrite en bas
 tirée d'une séquence serveur, et validation du paiement par le webhook signé du prestataire,
 jamais par le retour du navigateur.
 
+### Avis
+
+**`components/reviews-context.tsx`** tient les avis (clé `mcm-avis-v1`), sur un article
+(`{ kind: "product", productId }`) ou sur la boutique (`{ kind: "shop" }`). `aggregate()`
+recalcule la moyenne — arrondie à une décimale — et la distribution des cinq notes à chaque
+lecture : plus aucun chiffre d'avis n'est écrit en dur. La fiche produit et la page d'accueil
+affichent donc « aucun avis » tant que personne n'a écrit, au lieu d'inventer un 4,8.
+
+**Le droit d'écrire vient d'une commande reçue.** `components/review-form.tsx` cherche une
+commande au statut `livree` qui porte l'article (n'importe laquelle pour la boutique) ; sans
+elle, le formulaire reste affiché et explique pourquoi il est fermé. Un compte n'a qu'un avis
+par cible : le suivant remplace le précédent, et chacune supprime le sien.
+
+Le statut n'avançant pas tout seul, la page de suivi porte un bouton **« J'ai reçu ma
+commande »** (`confirmDelivery`) — c'est le seul évènement qui fait passer une commande à
+`livree` aujourd'hui, et donc ce qui ouvre le dépôt d'avis.
+
+Sur la page d'accueil, les trois avis d'exemple de `REVIEWS` ne servent que tant qu'aucun avis
+boutique n'existe ; dès le premier déposé, ce sont les vrais qui s'affichent, avec la vraie
+moyenne à la place du « 4,9/5 sur 126 avis ».
+
+**À reproduire côté serveur.** La vérification est ici côté client : éditer le stockage suffit
+à la contourner. En ligne, l'avis se rattache à une ligne de commande livrée, l'unicité se
+tient en base, et la modération annoncée demande un vrai passage en revue avant publication.
+
+### Back-office
+
+Il était une maquette : `components/admin.tsx` affichait des tableaux écrits en dur, et
+`lib/admin/{types,seed,store}.ts(x)` — 1 300 lignes déjà à la bonne forme — n'était importé par
+personne. Le magasin est maintenant branché, et la maquette a été supprimée.
+
+**`lib/admin/store.tsx`** tient tout le back-office dans une seule clé (`mcm-admin-v1`) :
+produits, commandes, clientes, rayons, promotions, bibliothèque, réglages, bandeau d'accueil et
+journal des actions. Il expose une vingtaine de mutations et, à côté, les fonctions dérivées —
+`computePeriod`, `buildDailySeries`, `computeProductPerformance`, `computeCustomerStats`. Aucun
+chiffre n'est écrit dans une page : tout se recalcule à partir des commandes.
+
+**`migrer()` accompagne chaque changement de forme.** Un navigateur qui a déjà l'ancien format
+lit `undefined` et la page tombe ; toute modification de `AdminState` doit ajouter son entrée.
+
+**La navigation reprend celle de 3001** — mêmes libellés, même ordre — pour qu'on passe de l'un à
+l'autre sans se réapprendre le menu. La palette de commandes (Ctrl/⌘ + K) cherche dans les pages,
+les fiches, les commandes et les clientes ; Entrée ouvre le premier résultat.
+
+**Les promotions** sont la page la plus travaillée, reprise trait pour trait de 3001 : campagnes
+en bons de réduction (talon, encoches, pointillé), onglets Toutes / En cours / Programmées /
+Terminées avec leurs compteurs, barre d'avancement et « N j restants », portée résumée en une
+phrase, et un tiroir latéral pour la saisie — durées proposées, pastilles de choix expliquées,
+et la cascade rayon → article plutôt qu'une liste de tout le catalogue.
+
+**La pagination est dans la primitive**, pas dans les pages : `usePagination` découpe une liste et
+`Pagination` dessine la barre ; `Table` s'en sert tout seul, avec `pageSize` et le nom de ce qu'on
+compte (« 1–20 sur 243 commandes »). Les deux grilles de cartes — promotions et catégories — les
+appellent directement. Un changement de filtre ou de recherche ramène en page 1, et la page
+courante se recale d'elle-même quand une suppression raccourcit la liste.
+
+L'interface tient en deux fichiers de base : **`components/admin/ui.tsx`** (tableau en grille CSS,
+pastilles de statut, champs, fenêtre modale, suppression en deux temps, barres dessinées à la
+main) et **`components/admin/shell.tsx`** (le portier et la chrome). Les icônes ont leur propre
+jeu, `components/admin/icons.tsx`, séparé de celui de la vitrine.
+
+Le fournisseur ne descend que sur `/admin` (`app/admin/layout.tsx`) : la vitrine n'a pas à porter
+un état qu'elle n'ouvre jamais. Le groupe `(espace)` porte le portier et la chrome ;
+`/admin/connexion` reste en dehors, sinon la page de connexion serait elle-même protégée.
+
+**Le portier n'est pas une sécurité.** Il regarde une clé du navigateur, et les identifiants de
+démonstration sont écrits en clair dans la page de connexion
+(`ousseynou@mcommemaman.sn` / `mcm2026`). Tant que le back-office ne modifie qu'un état local,
+c'est sans conséquence. Dès qu'il écrit en base, il faut un vrai compte administrateur, une
+session en cookie signé, et la vérification du rôle sur le serveur à **chaque** écriture.
+
+**Deux ponts manquent encore**, et le back-office le dit lui-même sur les pages concernées :
+
+- Les commandes et les comptes de la vitrine (`mcm-commandes-v1`, `mcm-comptes-v1`) vivent dans le
+  navigateur de chaque cliente et ne remontent pas ici. C'est pour ça que le suivi de commande de
+  la vitrine se termine par un bouton « J'ai reçu ma commande » plutôt que par un statut piloté.
+- Ce que l'on modifie ici ne redescend pas sur la vitrine, qui lit encore ses constantes
+  (`lib/products.ts`, `lib/livraison.ts`, `components/hero.tsx`). Sur 3001 le pont existe : la
+  vitrine ouvre la clé du back-office à la main.
+
 ### Publication d'un produit
 
-`components/product-form.tsx` applique le garde-fou de l'audit. Cinq conditions avant publication :
+`components/product-form.tsx` est le seul éditeur : sans `product` il crée, avec il modifie, et il
+écrit dans le magasin. Les coloris, tailles et matières ne s'y saisissent pas — ils viennent de la
+bibliothèque, ce qui évite « rose poudré » d'un côté et « Rose Poudre » de l'autre. Il applique le
+garde-fou de l'audit : cinq conditions avant publication —
 nom commercial de 4 caractères minimum, au moins une photo, prix supérieur à zéro, description de
 20 caractères minimum, référence interne renseignée. Tant qu'il en manque une, seul
 « Enregistrer en brouillon » est actif et le panneau latéral liste ce qui manque.
@@ -245,4 +359,8 @@ alors quatre ou cinq photos de vie de ce niveau.
 5. Resend pour les e-mails de confirmation
 6. Comptes clients côté serveur : `auth-context.tsx` en est la maquette, pas l'implémentation
 7. NINEA et registre du commerce à renseigner dans `lib/legal.ts`
-8. Test sur vrai téléphone en 4G — la cible est mobile
+8. Back-office réel : compte administrateur en base, session en cookie signé, rôle vérifié à chaque écriture
+9. Ponts back-office ↔ vitrine : commandes et comptes remontés, réglages et catalogue redescendus
+10. Favoris rattachés au compte en base, fusion de la liste du navigateur à la connexion
+11. Avis vérifiés côté serveur : rattachement à une ligne de commande livrée, unicité, modération
+12. Test sur vrai téléphone en 4G — la cible est mobile

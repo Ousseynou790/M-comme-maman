@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "./auth-context";
 import { useOrders } from "./orders-context";
 import { useReviews, type Review, type ReviewTarget } from "./reviews-context";
@@ -75,11 +76,24 @@ export function ReviewForm({ target, titre }: { target: ReviewTarget; titre: str
   const { account } = useAuth();
   const { orders } = useOrders();
   const { reviewBy, submit, remove } = useReviews();
+  /* Retour sur la page en cours après connexion, fiche produit comprise. */
+  const chemin = usePathname();
 
   const existant = account ? reviewBy(account.email, target) : undefined;
   const [note, setNote] = useState(existant?.rating ?? 0);
   const [texte, setTexte] = useState(existant?.comment ?? "");
   const [envoye, setEnvoye] = useState(false);
+
+  /* L'avis déjà déposé n'est connu qu'après hydratation : on recale les champs
+     quand il arrive, sans écraser une saisie en cours. */
+  const [reprisDe, setReprisDe] = useState<string | null>(null);
+  useEffect(() => {
+    if (existant && existant.id !== reprisDe) {
+      setReprisDe(existant.id);
+      setNote(existant.rating);
+      setTexte(existant.comment);
+    }
+  }, [existant, reprisDe]);
 
   const livrees = orders.filter((o) => o.status === "livree");
   const commandeLiee =
@@ -91,7 +105,7 @@ export function ReviewForm({ target, titre }: { target: ReviewTarget; titre: str
     return (
       <p className="rounded-2xl border border-dashed border-line px-5 py-4 text-[13px] leading-relaxed text-muted">
         <Link
-          href="/compte/connexion?suite=/avis"
+          href={`/compte/connexion?suite=${encodeURIComponent(chemin)}`}
           className="font-bold text-rose underline underline-offset-4"
         >
           Connectez-vous

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { formatXOF } from "@/lib/format";
 import { type Product } from "@/lib/products";
 import { useCart } from "./cart-context";
 import { useSpotlight } from "./motion";
-import { IconBag, IconHeart, IconHeartFull } from "./icons";
+import { FavoriteButton } from "./favorite-button";
+import { IconBag } from "./icons";
 
 /* Les deux pastilles posées au bas de la photo : même dessin, même montée au
    survol, seul le coin change. Rien ne se déclenche au doigt, où le lien de la
@@ -26,10 +26,6 @@ export function ProductCard({
 }) {
   const ref = useSpotlight<HTMLDivElement>();
   const { add } = useCart();
-
-  /* Le cœur ne vit que le temps de la visite : il n'y a pas encore de liste
-     de favoris, ni côté serveur ni en mémoire partagée. */
-  const [aime, setAime] = useState(false);
 
   const discount = product.compareAt
     ? Math.round((1 - product.price / product.compareAt) * 100)
@@ -72,16 +68,11 @@ export function ProductCard({
         {/* Le cœur reste visible en permanence, comme sur la maquette boty :
             c'est le seul geste qui ne coûte rien, il ne se mérite pas au
             survol. */}
-        <button
-          onClick={() => setAime((v) => !v)}
-          aria-pressed={aime}
-          aria-label={aime ? `Retirer ${product.name} des favoris` : `Ajouter ${product.name} aux favoris`}
-          className={`absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 backdrop-blur transition-all duration-300 ease-soft hover:scale-105 active:scale-90 ${
-            aime ? "text-rose" : "text-ink/70 hover:text-rose"
-          }`}
-        >
-          {aime ? <IconHeartFull className="h-4 w-4" /> : <IconHeart className="h-4 w-4" />}
-        </button>
+        <FavoriteButton
+          productId={product.id}
+          productName={product.name}
+          className="absolute right-3 top-3 z-20"
+        />
 
         {!product.outOfStock && (
           <button

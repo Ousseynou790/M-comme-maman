@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatXOF } from "@/lib/format";
 import { COLORS, SIZES, type Product } from "@/lib/products";
 import { useCart } from "./cart-context";
+import { FavoriteButton } from "./favorite-button";
 
 export function QuickView({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const { add } = useCart();
@@ -90,6 +91,13 @@ export function QuickView({ product, onClose }: { product: Product | null; onClo
             >
               Voir la fiche
             </Link>
+            <FavoriteButton
+              productId={product.id}
+              productName={product.name}
+              size="md"
+              variant="contour"
+              className="shrink-0"
+            />
           </div>
         </div>
       </div>

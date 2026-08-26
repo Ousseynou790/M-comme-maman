@@ -19,6 +19,8 @@ const COLUMNS = [
       { href: "/contact", label: "Nous contacter" },
       { href: "/compte", label: "Mon compte" },
       { href: "/commandes", label: "Suivre ma commande" },
+      { href: "/avis", label: "Avis des clientes" },
+      { href: "/favoris", label: "Mes favoris" },
     ],
   },
   {
