@@ -1,0 +1,285 @@
+/**
+ * Le pont vers le serveur Django.
+ *
+ * Deux chemins, et il faut savoir lequel on emprunte :
+ *
+ * — **Depuis un composant serveur** (`lireCatalogue`, `lireFiche`…), l'appel
+ *   part du serveur Next vers le serveur Django. Pas de cookie, pas de CSRF :
+ *   on ne lit que du public. C'est ce chemin qui donne le rendu côté serveur,
+ *   donc les pages remplies avant même que le JavaScript arrive.
+ *
+ * — **Depuis le navigateur** (`envoyer`), l'appel porte le cookie de session et
+ *   le jeton CSRF. C'est le seul chemin pour tout ce qui écrit.
+ *
+ * Aucune adresse n'est écrite en dur ailleurs que dans ce fichier.
+ */
+
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+
+export class ErreurApi extends Error {
+  constructor(
+    message: string,
+    readonly statut: number,
+    readonly champs: Record<string, string[]> = {},
+  ) {
+    super(message);
+    this.name = "ErreurApi";
+  }
+}
+
+/** Le message le plus utile que porte une réponse en erreur. */
+function messageDe(corps: unknown, statut: number): string {
+  if (corps && typeof corps === "object") {
+    const objet = corps as Record<string, unknown>;
+    if (typeof objet.detail === "string") return objet.detail;
+    const premier = Object.values(objet)[0];
+    if (Array.isArray(premier) && typeof premier[0] === "string") return premier[0];
+  }
+  if (statut >= 500) return "Le serveur ne répond pas correctement. Réessayez dans un instant.";
+  return "La demande n'a pas abouti.";
+}
+
+/* ------------------------------------------------------------------ lecture */
+
+type OptionsLecture = {
+  /** Secondes de cache. 0 pour toujours redemander — les stocks bougent. */
+  revalider?: number;
+};
+
+/**
+ * Lecture publique, depuis le serveur Next ou le navigateur.
+ *
+ * Renvoie `null` plutôt que de lever quand la ressource n'existe pas : une
+ * fiche supprimée doit donner une page « introuvable », pas une erreur 500.
+ */
+export async function lire<T>(
+  chemin: string,
+  { revalider = 60 }: OptionsLecture = {},
+): Promise<T | null> {
+  const reponse = await fetch(`${BASE}${chemin}`, {
+    next: { revalidate: revalider },
+    headers: { Accept: "application/json" },
+  });
+
+  if (reponse.status === 404) return null;
+  if (!reponse.ok) {
+    throw new ErreurApi(messageDe(await reponse.json().catch(() => null), reponse.status), reponse.status);
+  }
+  return reponse.json();
+}
+
+/* ------------------------------------------------------------------ écriture */
+
+/** Le jeton CSRF, posé en cookie par le serveur au premier appel. */
+function jetonCsrf(): string {
+  const trouve = document.cookie
+    .split("; ")
+    .find((morceau) => morceau.startsWith("csrftoken="));
+  return trouve ? decodeURIComponent(trouve.slice("csrftoken=".length)) : "";
+}
+
+let cookieDemande = false;
+
+/**
+ * S'assure que le cookie CSRF est posé.
+ *
+ * Une seule fois par chargement : le cookie survit ensuite à toutes les
+ * requêtes de la session.
+ */
+async function assurerCsrf(): Promise<void> {
+  if (jetonCsrf() || cookieDemande) return;
+  cookieDemande = true;
+  await fetch(`${BASE}/api/compte/csrf/`, { credentials: "include" }).catch(() => {
+    // Sans jeton, la première écriture échouera avec un message clair : mieux
+    // vaut ça qu'un plantage silencieux au chargement de la page.
+    cookieDemande = false;
+  });
+}
+
+type Methode = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+/**
+ * Appel authentifié depuis le navigateur.
+ *
+ * `credentials: "include"` fait voyager le cookie de session, que le
+ * JavaScript ne peut pas lire — c'est précisément ce qui le protège.
+ */
+export async function envoyer<T>(
+  chemin: string,
+  methode: Methode = "GET",
+  corps?: unknown,
+): Promise<T> {
+  if (methode !== "GET") await assurerCsrf();
+
+  const reponse = await fetch(`${BASE}${chemin}`, {
+    method: methode,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(corps ? { "Content-Type": "application/json" } : {}),
+      ...(methode !== "GET" ? { "X-CSRFToken": jetonCsrf() } : {}),
+    },
+    body: corps ? JSON.stringify(corps) : undefined,
+  });
+
+  if (reponse.status === 204) return undefined as T;
+
+  const donnees = await reponse.json().catch(() => null);
+  if (!reponse.ok) {
+    const champs =
+      donnees && typeof donnees === "object" && !Array.isArray(donnees)
+        ? (donnees as Record<string, string[]>)
+        : {};
+    throw new ErreurApi(messageDe(donnees, reponse.status), reponse.status, champs);
+  }
+  return donnees as T;
+}
+
+/**
+ * Envoi d'un fichier.
+ *
+ * Pas de `Content-Type` posé à la main : le navigateur doit composer lui-même
+ * la frontière du multipart, et l'écraser casse la requête sans rien dire.
+ */
+export async function televerser<T>(chemin: string, forme: FormData): Promise<T> {
+  await assurerCsrf();
+
+  const reponse = await fetch(`${BASE}${chemin}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json", "X-CSRFToken": jetonCsrf() },
+    body: forme,
+  });
+
+  const donnees = await reponse.json().catch(() => null);
+  if (!reponse.ok) {
+    const champs =
+      donnees && typeof donnees === "object" && !Array.isArray(donnees)
+        ? (donnees as Record<string, string[]>)
+        : {};
+    throw new ErreurApi(messageDe(donnees, reponse.status), reponse.status, champs);
+  }
+  return donnees as T;
+}
+
+/* ------------------------------------------------------------------ formes */
+
+/** Ce que renvoie une liste paginée du serveur. */
+export type Page<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+/** Ce qu'on achète réellement : un produit dans une taille et un coloris. */
+export type VarianteApi = {
+  id: number;
+  sku: string;
+  taille_valeur: string;
+  taille_repere: string;
+  coloris_nom: string;
+  coloris_hexa: string;
+  stock: number;
+  disponible: boolean;
+};
+
+/** Un produit tel que le serveur le décrit. */
+export type ProduitApi = {
+  id: number;
+  slug: string;
+  nom: string;
+  prix: number;
+  prix_barre: number | null;
+  /** Ce qu'on paie aujourd'hui : le prix de la fiche, remise en cours déduite. */
+  prix_public: number;
+  /** Le prix à barrer — celui d'avant la remise, ou le prix barré saisi. */
+  prix_avant: number | null;
+  /** La campagne qui s'applique, s'il y en a une. */
+  promotion: {
+    libelle: string;
+    pourcentage: number;
+    economie: number;
+    jusquau: string;
+  } | null;
+  description: string;
+  matiere: string;
+  rayon_nom: string;
+  rayon_slug: string;
+  univers: "enfant" | "maman";
+  genre: "fille" | "garcon" | "mixte" | "";
+  age: "2-10" | "11-14" | "";
+  image: string;
+  photos: string[];
+  tailles: { valeur: string; repere: string; disponible: boolean; ordre: number }[];
+  coloris: { nom: string; hexa: string }[];
+  en_rupture: boolean;
+  variantes?: VarianteApi[];
+};
+
+export type SousRayonApi = {
+  id: number;
+  nom: string;
+  slug: string;
+  description: string;
+  ordre: number;
+  nombre_produits: number;
+};
+
+export type RayonApi = {
+  id: number;
+  nom: string;
+  slug: string;
+  /**
+   * Les catégories qui la contiennent. Vide pour une catégorie de premier
+   * niveau ; plusieurs quand elle se range à deux endroits.
+   */
+  parents: number[];
+  parents_slugs: string[];
+  parents_noms: string[];
+  /** Les sous-catégories, déjà triées. */
+  enfants: SousRayonApi[];
+  univers: "enfant" | "maman";
+  description: string;
+  image_url: string;
+  ordre: number;
+  nombre_produits: number;
+};
+
+/* ------------------------------------------------------------------- panier */
+
+/**
+ * Une ligne de panier.
+ *
+ * Le serveur recopie ici le nom, le prix et l'image : la vignette se dessine
+ * sans second appel, et le panier reste lisible même si la fiche bouge.
+ */
+export type LignePanierApi = {
+  id: number;
+  variante: number;
+  produit: number;
+  slug: string;
+  nom: string;
+  /** « Rose poudré · 4 ans », composé côté serveur. */
+  option: string;
+  image: string;
+  prix_unitaire: number;
+  quantite: number;
+  sous_total: number;
+  stock_restant: number;
+  /** Faux quand la fiche est dépubliée ou le stock retombé sous la quantité. */
+  disponible: boolean;
+};
+
+export type PanierApi = {
+  id: number;
+  lignes: LignePanierApi[];
+  sous_total: number;
+  nombre_articles: number;
+  /** Faux dès qu'une ligne n'est plus servable — le tunnel le dit avant la caisse. */
+  complet: boolean;
+  modifie_le: string;
+  /** Seulement en réponse à une fusion : les articles épuisés, laissés de côté. */
+  ignorees?: string[];
+};

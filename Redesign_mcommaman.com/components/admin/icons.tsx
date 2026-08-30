@@ -77,6 +77,26 @@ export function IconCart({ className }: Props) {
   );
 }
 
+/** Un seul buste : le compte de la personne connectée, pas le fichier clientes. */
+export function IconUserAdmin({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="8.2" r="3.6" />
+      <path d="M4.9 20a7.4 7.4 0 0 1 14.2 0" />
+    </Svg>
+  );
+}
+
+/** Cadenas fermé : le mot de passe. */
+export function IconLockAdmin({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <rect x="4.4" y="10.4" width="15.2" height="9.4" rx="2.4" />
+      <path d="M8.3 10.4V8.2a3.7 3.7 0 0 1 7.4 0v2.2" />
+    </Svg>
+  );
+}
+
 export function IconUsers({ className }: Props) {
   return (
     <Svg className={className}>

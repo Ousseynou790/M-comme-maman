@@ -6,8 +6,8 @@ const COLUMNS = [
     title: "Boutique",
     links: [
       { href: "/boutique", label: "Catalogue" },
-      { href: "/boutique?age=0-1", label: "Bébé" },
       { href: "/boutique?cat=Chaussures", label: "Chaussures" },
+      { href: "/coin-maman", label: "Coin Maman" },
     ],
   },
   {

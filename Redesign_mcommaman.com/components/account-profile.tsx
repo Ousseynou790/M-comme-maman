@@ -9,7 +9,7 @@ import { useAuth, type ZoneKey } from "./auth-context";
 import { useOrders } from "./orders-context";
 import { OrderStatusBadge } from "./order-status-badge";
 import { AccountNav } from "./account-nav";
-import { Checkbox, PasswordField, SectionCard, TextField } from "./form-kit";
+import { PasswordField, SectionCard, TextField } from "./form-kit";
 import { IconArrow, IconCheck, IconClose, IconLock, IconMail, IconPackage, IconPhone, IconPin, IconPlus, IconStar, IconTrash, IconUser } from "./icons";
 
 const SHELL = "mx-auto w-full max-w-[1180px] px-5 md:px-8 lg:px-10";
@@ -466,15 +466,6 @@ export function AccountProfile() {
                 );
               })}
             </div>
-
-            <div className="mt-6">
-              <Checkbox
-                checked={account.preferences.newsletter}
-                onChange={(coche) => updatePreferences({ newsletter: coche })}
-              >
-                Recevoir les nouveautés et les ventes privées par e-mail.
-              </Checkbox>
-            </div>
           </SectionCard>
 
           {/* ---------------------------------------------- sécurité */}
@@ -516,26 +507,41 @@ export function AccountProfile() {
 
             <div className="mt-6 border-t border-line pt-5">
               {confirmeSuppression ? (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortie(true);
-                      deleteAccount();
-                      router.replace("/");
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-rose-deep/30 px-5 py-3 text-[13.5px] font-bold text-rose-deep transition-colors duration-300 hover:bg-rose-soft"
-                  >
-                    <IconTrash className="h-4 w-4" />
-                    Confirmer la suppression
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmeSuppression(false)}
-                    className="rounded-full px-5 py-3 text-[13.5px] font-semibold text-muted transition-colors hover:text-ink"
-                  >
-                    Annuler
-                  </button>
+                <div className="flex flex-col gap-3">
+                  {/* Dire ce qui se passe vraiment : le compte porte l'historique
+                      des commandes, il ne s'efface pas d'un clic. */}
+                  <p className="rounded-2xl bg-rose-soft px-4 py-3 text-[12.5px] leading-relaxed text-rose-deep">
+                    Votre compte porte l&apos;historique de vos commandes&nbsp;: il ne s&apos;efface
+                    pas depuis cette page. Écrivez-nous et nous le supprimons, avec vos adresses,
+                    sous quelques jours. En attendant, ce bouton ferme simplement votre session.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/contact"
+                      className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-rose-deep/30 px-5 py-3 text-[13.5px] font-bold text-rose-deep transition-colors duration-300 hover:bg-rose-soft"
+                    >
+                      <IconTrash className="h-4 w-4" />
+                      Demander la suppression
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortie(true);
+                        deleteAccount();
+                        router.replace("/");
+                      }}
+                      className="rounded-full px-5 py-3 text-[13.5px] font-semibold text-muted transition-colors hover:text-ink"
+                    >
+                      Fermer ma session
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmeSuppression(false)}
+                      className="rounded-full px-5 py-3 text-[13.5px] font-semibold text-muted transition-colors hover:text-ink"
+                    >
+                      Annuler
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -546,10 +552,6 @@ export function AccountProfile() {
                   Supprimer mon compte
                 </button>
               )}
-              <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
-                La suppression retire le compte de ce navigateur, avec ses adresses et ses
-                préférences. Elle est immédiate et sans retour.
-              </p>
             </div>
           </SectionCard>
         </div>

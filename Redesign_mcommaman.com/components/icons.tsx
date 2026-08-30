@@ -418,3 +418,13 @@ export function IconGmail({ className = base }: Props) {
     </svg>
   );
 }
+
+export function IconInstagram({ className }: Props) {
+  return (
+    <Svg className={className}>
+      <rect x="3.4" y="3.4" width="17.2" height="17.2" rx="5" />
+      <circle cx="12" cy="12" r="4.1" />
+      <circle cx="17.1" cy="6.9" r="1.05" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}

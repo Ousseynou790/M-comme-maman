@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { formatXOF } from "@/lib/format";
 import { useAdmin } from "@/lib/admin/store";
+import { envoyer } from "@/lib/api";
 import {
   IconBell,
   IconBox,
@@ -18,14 +19,13 @@ import {
   IconSearchAdmin,
   IconSliders,
   IconStore,
+  IconUserAdmin,
   IconTagAdmin,
   IconUsers,
   IconX,
 } from "./icons";
 
 /** La session d'administration : une clé, rien de plus. Voir la note en bas. */
-export const ADMIN_SESSION_KEY = "mcm-admin-session";
-
 export const NAV = [
   { href: "/admin", label: "Tableau de bord", Icone: IconGrid },
   { href: "/admin/produits", label: "Produits", Icone: IconBox },
@@ -162,27 +162,39 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
 /**
  * Le portier.
  *
- * Il ne vérifie rien d'autre que la présence d'une clé. Tant que la lecture du
- * stockage n'a pas eu lieu on n'affiche rien : afficher le back-office puis le
- * retirer serait pire que d'attendre un instant.
+ * Elle demande au serveur qui est connecté et n'ouvre que pour l'équipe.
+ * Tant que la réponse n'est pas là on n'affiche rien : montrer le back-office
+ * puis le retirer serait pire que d'attendre un instant.
+ *
+ * Ce n'est plus décoratif. Chaque route de `/api/gestion/` revérifie de son
+ * côté : cacher un bouton ne protège rien, c'est le serveur qui refuse.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [etat, setEtat] = useState<"lecture" | "ouvert" | "ferme">("lecture");
 
   useEffect(() => {
-    let ouvert = false;
-    try {
-      ouvert = window.localStorage.getItem(ADMIN_SESSION_KEY) === "1";
-    } catch {
-      /* stockage indisponible : on renvoie à la connexion */
-    }
-    if (ouvert) {
-      setEtat("ouvert");
-    } else {
-      setEtat("ferme");
-      router.replace("/admin/connexion");
-    }
+    let vivant = true;
+
+    envoyer<{ utilisateur: { est_equipe: boolean } | null }>("/api/compte/moi/")
+      .then((reponse) => {
+        if (!vivant) return;
+        if (reponse.utilisateur?.est_equipe) {
+          setEtat("ouvert");
+        } else {
+          setEtat("ferme");
+          router.replace("/admin/connexion");
+        }
+      })
+      .catch(() => {
+        if (!vivant) return;
+        setEtat("ferme");
+        router.replace("/admin/connexion");
+      });
+
+    return () => {
+      vivant = false;
+    };
   }, [router]);
 
   if (etat !== "ouvert") {
@@ -205,7 +217,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const chemin = usePathname();
   const router = useRouter();
-  const { settings, orders, products, hydrated } = useAdmin();
+  const { settings, orders, products, hydrated, erreur } = useAdmin();
   const [menu, setMenu] = useState(false);
   const [palette, setPalette] = useState(false);
 
@@ -231,11 +243,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const ruptures = products.filter((p) => p.status === "publie" && p.stock <= 0).length;
 
   const deconnecter = () => {
-    try {
-      window.localStorage.removeItem(ADMIN_SESSION_KEY);
-    } catch {
-      /* rien à faire : la page part quand même */
-    }
+    // On ferme la session côté serveur : retirer une clé locale ne fermait rien.
+    envoyer("/api/compte/deconnexion/", "POST").catch(() => undefined);
     router.replace("/admin/connexion");
   };
 
@@ -274,6 +283,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   const pied = (
     <div className="mt-6 border-t border-white/10 pt-4">
+      <Link
+        href="/admin/compte"
+        aria-current={chemin === "/admin/compte" ? "page" : undefined}
+        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] transition-colors duration-300 ${
+          chemin === "/admin/compte"
+            ? "bg-white/12 font-bold text-white"
+            : "font-medium text-white/60 hover:text-white"
+        }`}
+      >
+        <IconUserAdmin className="h-[18px] w-[18px] shrink-0" />
+        Mon compte
+      </Link>
       <Link
         href="/"
         className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-white/60 transition-colors duration-300 hover:text-white"
@@ -379,6 +400,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
             à gauche est tout l'effet : il détache la page de la colonne au lieu
             de les faire se toucher à angle droit. */}
         <div className="flex-1 rounded-t-[22px] bg-[#faf8f9] lg:rounded-tr-none lg:rounded-tl-[26px]">
+          {/* Un refus du serveur s'affichait nulle part : le clic ne faisait
+              rien et rien n'expliquait pourquoi. Ici, une seule fois pour
+              toutes les pages. */}
+          {erreur && (
+            <div className="px-4 pt-6 sm:px-6 lg:px-8">
+              <p
+                role="alert"
+                className="rounded-2xl bg-rose-soft px-4 py-3.5 text-[13px] font-semibold leading-relaxed text-rose-deep"
+              >
+                {erreur}
+              </p>
+            </div>
+          )}
           <main className="px-4 pb-16 pt-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
@@ -387,12 +421,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
 }
 
 /**
- * Note — ce portier n'est pas une sécurité.
+ * Note — ce portier ne fait qu'éviter d'afficher une page inutile.
  *
- * Il regarde une clé du navigateur ; l'identifiant de démonstration est écrit
- * en clair dans la page de connexion. N'importe qui sachant ouvrir la console
- * entre. Tant que le back-office ne fait que modifier un état local, c'est sans
- * conséquence — le jour où il écrit en base, il faut un vrai compte
- * administrateur, une session en cookie HttpOnly signé, et la vérification du
- * rôle sur le serveur à chaque écriture, jamais dans le composant.
+ * Il demande au serveur qui est connecté et regarde le rôle. Ce n'est pas lui
+ * qui protège quoi que ce soit : chaque route de `/api/gestion/` revérifie le
+ * rôle de son côté, sur une session en cookie signé que le JavaScript ne peut
+ * pas lire. Contourner ce composant ne donne accès à rien.
  */

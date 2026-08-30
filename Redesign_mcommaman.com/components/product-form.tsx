@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatXOF } from "@/lib/format";
-import { CATEGORIES, type Age, type Gender } from "@/lib/products";
+import type { Age, Gender } from "@/lib/products";
 import { useAdmin } from "@/lib/admin/store";
 import { slugify } from "@/lib/admin/seed";
 import { AGES, GENDERS, type AdminProduct } from "@/lib/admin/types";
-import { Button, Modal, Note } from "./admin/ui";
+import { Button, Modal } from "./admin/ui";
 import { IconArrowLeft, IconCheck, IconImage, IconPlus, IconX } from "./admin/icons";
 
 const inputClass =
@@ -42,15 +43,63 @@ const nombre = (v: string) => Number(v.replace(/\s/g, "")) || 0;
  * back-office, pour que deux fiches ne finissent pas avec « rose poudré » et
  * « Rose Poudre ».
  */
+/**
+ * Une référence interne libre, dérivée du nom.
+ *
+ * Trois lettres et un numéro qui ne heurte aucune fiche existante : le serveur
+ * exige l'unicité, autant la proposer d'emblée plutôt que de la faire découvrir
+ * au moment d'enregistrer. Elle reste modifiable — c'est une suggestion.
+ */
+function referenceProposee(nom: string, prises: Set<string>): string {
+  const lettres =
+    (nom
+      .normalize("NFD")
+      .replace(/[^A-Za-z]/g, "")
+      .toUpperCase()
+      .slice(0, 3) || "REF").padEnd(3, "X");
+
+  for (let n = 1; n < 10_000; n += 1) {
+    const candidat = `${lettres}-${String(n).padStart(4, "0")}`;
+    if (!prises.has(candidat)) return candidat;
+  }
+  // Dix mille fiches partageant les mêmes trois lettres : on ne bloque pas.
+  return `${lettres}-${Date.now().toString(36).toUpperCase()}`;
+}
+
 export function ProductForm({ product }: { product?: AdminProduct }) {
   const router = useRouter();
-  const { library, createProduct, saveProduct, products } = useAdmin();
+  const { library, createProduct, saveProduct, products, categories } = useAdmin();
 
   const [name, setName] = useState(product?.name ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
+  /* Tant que la gérante n'a pas écrit sa propre référence, celle-ci suit le
+     nom. Dès qu'elle en saisit une, on ne la lui reprend plus. */
+  const [skuTouche, setSkuTouche] = useState(Boolean(product?.sku));
   const [price, setPrice] = useState(product ? String(product.price) : "");
-  const [compareAt, setCompareAt] = useState(product?.compareAt ? String(product.compareAt) : "");
-  const [category, setCategory] = useState<string>(product?.category ?? CATEGORIES[0]);
+  /* Les rayons viennent de la table des catégories, jamais d'une liste écrite
+     ici : en créer une nouvelle doit suffire à la voir apparaître. Les
+     sous-catégories d'abord, ce sont elles qui rangent vraiment une fiche. */
+  const rayons = useMemo(() => {
+    const racines = categories.filter((c) => c.parentSlugs.length === 0);
+    const groupes = racines.map((racine) => ({
+      titre: racine.label,
+      options: [
+        racine,
+        ...categories.filter((c) => c.parentSlugs.includes(racine.slug)),
+      ],
+    }));
+    /* Une sous-catégorie dont la parente aurait disparu resterait choisissable :
+       mieux vaut la proposer que la perdre. */
+    const orphelines = categories.filter(
+      (c) => c.parentSlugs.length > 0 && !racines.some((r) => c.parentSlugs.includes(r.slug)),
+    );
+    return orphelines.length
+      ? [...groupes, { titre: "Sans catégorie parente", options: orphelines }]
+      : groupes;
+  }, [categories]);
+
+  const premierRayon = rayons[0]?.options[0]?.label ?? "";
+  const [category, setCategory] = useState<string>(product?.category ?? premierRayon);
   const [age, setAge] = useState<Age>(product?.age ?? "2-10");
   const [gender, setGender] = useState<Gender>(product?.gender ?? "mixte");
   const [description, setDescription] = useState(product?.description ?? "");
@@ -64,8 +113,23 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
   const [adresse, setAdresse] = useState("");
   const [enregistre, setEnregistre] = useState<"none" | "brouillon" | "publie">("none");
 
+  const referencesPrises = useMemo(
+    () => new Set(products.filter((p) => p.id !== product?.id).map((p) => p.sku)),
+    [products, product?.id],
+  );
+
+  useEffect(() => {
+    if (skuTouche) return;
+    setSku(name.trim() ? referenceProposee(name, referencesPrises) : "");
+  }, [name, skuTouche, referencesPrises]);
+
+  /* Le premier rayon connu sert de valeur de départ : la liste arrive après le
+     premier rendu, quand le back-office a fini de lire la base. */
+  useEffect(() => {
+    if (!category && premierRayon) setCategory(premierRayon);
+  }, [category, premierRayon]);
+
   const priceNumber = nombre(price);
-  const compareNumber = nombre(compareAt);
   const slug = slugify(name);
 
   /**
@@ -106,13 +170,14 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
 
     const fiche: AdminProduct = {
       id: product?.id ?? `prod-${Date.now().toString(36)}`,
+      univers: product?.univers ?? "enfant",
       slug: slug || `fiche-${Date.now().toString(36)}`,
       name: name.trim(),
       sku: sku.trim(),
       price: priceNumber,
-      /* Un prix barré inférieur au prix afficherait une remise négative : on ne
-         le garde que s'il veut dire quelque chose. */
-      ...(compareNumber > priceNumber ? { compareAt: compareNumber } : {}),
+      /* Le prix barré ne se saisit plus ici : une fiche déjà en promotion garde
+         le sien tant qu'on ne le change pas. */
+      ...(product?.compareAt ? { compareAt: product.compareAt } : {}),
       category,
       gender,
       age,
@@ -160,11 +225,16 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
           <Button variant="contour" onClick={() => enregistrer("brouillon")}>
             Enregistrer en brouillon
           </Button>
-          <Button variant="rose" disabled={!canPublish} onClick={() => enregistrer("publie")}>
+          <Button
+            variant="rose"
+            disabled={!canPublish}
+            onClick={() => enregistrer("publie")}
+          >
             {product?.status === "publie" ? "Enregistrer et garder en ligne" : "Publier en boutique"}
           </Button>
         </div>
       </div>
+
 
       {enregistre !== "none" && (
         <div
@@ -215,27 +285,58 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 </p>
               )}
 
-              <Field label="Référence interne" hint="Visible en petit sur la fiche, jamais en titre.">
+              <Field
+                label="Référence interne"
+                hint={
+                  skuTouche
+                    ? "La vôtre. Elle doit rester unique."
+                    : "Proposée d'après le nom, modifiable."
+                }
+              >
                 <input
                   value={sku}
-                  onChange={(e) => setSku(e.target.value.toUpperCase())}
-                  placeholder="RBP-0040"
+                  onChange={(e) => {
+                    setSkuTouche(true);
+                    setSku(e.target.value.toUpperCase());
+                  }}
+                  placeholder="TEE-0001"
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Catégorie">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className={inputClass}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+              <Field
+                label="Catégorie"
+                hint={
+                  rayons.length === 0
+                    ? undefined
+                    : "Rangez la fiche dans une sous-catégorie de préférence : c'est elle qui la fait apparaître en boutique."
+                }
+              >
+                {rayons.length === 0 ? (
+                  <p className="rounded-xl bg-rose-soft px-4 py-3 text-[12.5px] leading-relaxed text-rose-deep">
+                    Aucune catégorie n&apos;existe.{" "}
+                    <Link href="/admin/categories" className="underline underline-offset-2">
+                      Créez-en une d&apos;abord
+                    </Link>{" "}
+                    : une fiche appartient toujours à un rayon.
+                  </p>
+                ) : (
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className={inputClass}
+                  >
+                    {rayons.map((groupe) => (
+                      <optgroup key={groupe.titre} label={groupe.titre}>
+                        {groupe.options.map((c) => (
+                          <option key={c.id} value={c.label}>
+                            {c.parentSlugs.length > 0 ? `\u00a0\u00a0${c.label}` : c.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
               </Field>
 
               <Field label="Tranche d'âge">
@@ -362,28 +463,13 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
           {/* --------------------------------------------------- prix et stock */}
           <section className="rounded-[20px] border border-line bg-white p-5 sm:p-6">
             <h2 className="mb-4 text-[15px] font-extrabold tracking-tight">Prix et stock</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Prix de vente" hint="En francs CFA, nombre entier.">
                 <div className="relative">
                   <input
                     value={price}
                     onChange={(e) => setPrice(e.target.value.replace(/[^\d\s]/g, ""))}
                     placeholder="12 000"
-                    inputMode="numeric"
-                    className={`${inputClass} pr-14`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12.5px] font-semibold text-muted">
-                    F CFA
-                  </span>
-                </div>
-              </Field>
-
-              <Field label="Prix barré (facultatif)" hint="Affiche le badge Promo sur la carte.">
-                <div className="relative">
-                  <input
-                    value={compareAt}
-                    onChange={(e) => setCompareAt(e.target.value.replace(/[^\d\s]/g, ""))}
-                    placeholder="14 000"
                     inputMode="numeric"
                     className={`${inputClass} pr-14`}
                   />
@@ -403,19 +489,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 />
               </Field>
             </div>
-
-            {compareNumber > 0 && priceNumber > 0 && compareNumber <= priceNumber && (
-              <p className="mt-3 rounded-xl bg-rose-soft px-4 py-3 text-[12.5px] font-semibold text-rose-deep">
-                Le prix barré doit être supérieur au prix de vente, sinon la remise affichée sera
-                fausse. Tel quel, il ne sera pas enregistré.
-              </p>
-            )}
-            {compareNumber > priceNumber && priceNumber > 0 && (
-              <p className="mt-3 text-[12.5px] text-muted">
-                Remise affichée : −{Math.round((1 - priceNumber / compareNumber) * 100)} % ·{" "}
-                {formatXOF(compareNumber - priceNumber)} d&apos;économie
-              </p>
-            )}
           </section>
 
           {/* -------------------------------------------------------- variantes */}
@@ -518,7 +591,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 className="relative flex aspect-3/4 items-end overflow-hidden rounded-2xl bg-stone bg-cover bg-center p-3"
                 style={photos[0] ? { backgroundImage: `url(${photos[0]})` } : undefined}
               >
-                {compareNumber > priceNumber && priceNumber > 0 && (
+                {Boolean(product?.compareAt) && (
                   <span className="absolute left-3 top-3 rounded-full bg-rose px-3 py-1.5 text-[11.5px] font-bold text-white">
                     Promo
                   </span>
@@ -535,9 +608,9 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                   <span className="text-[15px] font-extrabold tabular-nums">
                     {priceNumber > 0 ? formatXOF(priceNumber) : "— F"}
                   </span>
-                  {compareNumber > priceNumber && (
+                  {product?.compareAt && (
                     <span className="text-[13px] text-muted line-through">
-                      {formatXOF(compareNumber)}
+                      {formatXOF(product.compareAt)}
                     </span>
                   )}
                 </div>
@@ -547,11 +620,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
               </div>
             </div>
           </div>
-
-          <Note>
-            Les cinq conditions de publication sont à vérifier côté serveur aussi, pas seulement
-            ici : un appel direct à l&apos;API contournerait le brouillon.
-          </Note>
         </aside>
       </div>
 

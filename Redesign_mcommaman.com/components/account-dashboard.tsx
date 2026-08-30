@@ -41,7 +41,7 @@ const initiales = (nom: string) =>
 export function AccountDashboard() {
   const router = useRouter();
   const { account, hydrated, logout } = useAuth();
-  const { items, count, subtotal, optionLabel } = useCart();
+  const { lignes, count, subtotal } = useCart();
   const { orders } = useOrders();
   const { ids: favorisIds, count: favoris } = useFavorites();
 
@@ -249,7 +249,7 @@ export function AccountDashboard() {
                 <p className="text-[11px] font-bold uppercase tracking-[.16em] text-rose">En cours</p>
                 <h2 className="mt-1 text-base font-extrabold tracking-tight">Mon panier</h2>
               </div>
-              {items.length > 0 && (
+              {lignes.length > 0 && (
                 <Link
                   href="/panier"
                   className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-muted transition-colors hover:text-rose"
@@ -260,39 +260,39 @@ export function AccountDashboard() {
               )}
             </header>
 
-            {items.length > 0 ? (
+            {lignes.length > 0 ? (
               <>
                 <ul className="flex flex-col gap-4">
-                  {items.slice(0, 3).map((i) => (
-                    <li key={`${i.id}-${i.color}-${i.size}`} className="flex gap-3.5">
+                  {lignes.slice(0, 3).map((l) => (
+                    <li key={l.id} className="flex gap-3.5">
                       <Link
-                        href={`/p/${i.slug}`}
+                        href={`/p/${l.slug}`}
                         className="h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-stone bg-cover bg-center"
-                        style={{ backgroundImage: `url(${i.image})` }}
-                        aria-label={i.name}
+                        style={{ backgroundImage: `url(${l.image})` }}
+                        aria-label={l.nom}
                       />
                       <div className="min-w-0 flex-1">
                         <Link
-                          href={`/p/${i.slug}`}
+                          href={`/p/${l.slug}`}
                           className="line-clamp-1 text-[13.5px] font-bold transition-colors hover:text-rose"
                         >
-                          {i.name}
+                          {l.nom}
                         </Link>
                         <p className="mt-1 text-[12.5px] text-muted">
-                          {optionLabel({ id: i.id, qty: i.qty, color: i.color, size: i.size })} · ×{i.qty}
+                          {l.option} · ×{l.quantite}
                         </p>
                       </div>
                       <span className="shrink-0 text-[13.5px] font-extrabold tabular-nums">
-                        {formatXOF(i.price * i.qty)}
+                        {formatXOF(l.sous_total)}
                       </span>
                     </li>
                   ))}
                 </ul>
 
-                {items.length > 3 && (
+                {lignes.length > 3 && (
                   <p className="mt-3.5 text-[12.5px] text-muted">
-                    et {items.length - 3} autre{items.length - 3 > 1 ? "s" : ""} article
-                    {items.length - 3 > 1 ? "s" : ""}.
+                    et {lignes.length - 3} autre{lignes.length - 3 > 1 ? "s" : ""} article
+                    {lignes.length - 3 > 1 ? "s" : ""}.
                   </p>
                 )}
 

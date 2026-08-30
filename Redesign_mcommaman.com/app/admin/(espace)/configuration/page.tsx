@@ -7,7 +7,6 @@ import {
   Button,
   Field,
   Input,
-  Note,
   PageHeader,
   Section,
 } from "@/components/admin/ui";
@@ -297,14 +296,6 @@ export default function Page() {
             </div>
           )}
         </Section>
-      </div>
-
-      <div className="mt-4">
-        <Note>
-          Une taille ou un coloris encore portés par une fiche ne se suppriment pas : le bouton
-          reste, désactivé, et le nombre de fiches concernées est affiché à côté. Supprimer d&apos;un
-          côté sans regarder l&apos;autre est la manière la plus simple de casser un catalogue.
-        </Note>
       </div>
     </>
   );

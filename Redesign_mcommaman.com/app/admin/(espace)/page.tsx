@@ -172,10 +172,6 @@ export default function Page() {
           Icone={IconGrid}
         />
       </div>
-
-      <p className="mt-8 text-center text-[12px] text-muted">
-        Données de démonstration générées localement — les modifications restent dans ce navigateur.
-      </p>
     </>
   );
 }

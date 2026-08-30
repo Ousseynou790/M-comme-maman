@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "./auth-context";
-import { IconLock, IconMail, IconPhone, IconPin, IconShield, IconUser } from "./icons";
+import { IconLock, IconMail, IconPhone, IconPin, IconUser } from "./icons";
 import { Alert, AuthShell, Checkbox, PasswordField, PasswordMeter, SubmitButton, TextField } from "./form-kit";
 
 /* Après connexion, on repart d'où l'on venait. `?suite=` est posé par les liens
@@ -92,9 +92,13 @@ export function LoginForm() {
             onChange={setPassword}
             autoComplete="current-password"
           />
-          <p className="mt-2 text-right text-[11.5px] text-muted">
-            Mot de passe oublié ? Écrivez-nous au{" "}
-            <span className="whitespace-nowrap font-semibold text-ink">+221 76 208 02 02</span>
+          <p className="mt-2 text-right text-[12px]">
+            <Link
+              href="/compte/mot-de-passe-oublie"
+              className="font-semibold text-rose underline underline-offset-4"
+            >
+              Mot de passe oublié ?
+            </Link>
           </p>
         </div>
 
@@ -135,7 +139,6 @@ export function SignupForm() {
   const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [newsletter, setNewsletter] = useState(true);
   const [conditions, setConditions] = useState(false);
   const [touches, setTouches] = useState<Set<Champ>>(new Set());
   const [erreur, setErreur] = useState<string | null>(null);
@@ -169,7 +172,7 @@ export function SignupForm() {
     if (Object.keys(erreurs).length > 0) return;
 
     setEnvoi(true);
-    const resultat = await register({ name, email, phone, city, password, newsletter });
+    const resultat = await register({ name, email, phone, city, password });
     setEnvoi(false);
 
     if (!resultat.ok) {
@@ -284,9 +287,6 @@ export function SignupForm() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <Checkbox checked={newsletter} onChange={setNewsletter}>
-            Je souhaite recevoir les nouveautés et les ventes privées par e-mail.
-          </Checkbox>
           <Checkbox
             checked={conditions}
             onChange={(v) => {
@@ -318,13 +318,6 @@ export function SignupForm() {
           <SubmitButton pending={envoi} pendingLabel="Création du compte…">
             Créer mon compte
           </SubmitButton>
-
-          <p className="flex gap-2.5 rounded-2xl bg-mist px-4 py-3.5 text-[11.5px] leading-relaxed text-muted">
-            <IconShield className="mt-0.5 h-4 w-4 shrink-0 text-rose" />
-            Maquette : le compte est enregistré dans ce navigateur, pas sur un serveur. Le mot de
-            passe est haché avec un sel, mais n&apos;utilisez pas ici un mot de passe qui vous sert
-            ailleurs.
-          </p>
         </div>
       </form>
     </AuthShell>

@@ -31,8 +31,8 @@ import {
 const NAV = [
   { href: "/boutique?g=fille", label: "Filles" },
   { href: "/boutique?g=garcon", label: "Garçons" },
-  { href: "/boutique?age=0-1", label: "Bébés" },
   { href: "/boutique?cat=Chaussures", label: "Chaussures" },
+  { href: "/coin-maman", label: "Coin Maman" },
   { href: "/avis", label: "Avis" },
   { href: "/contact", label: "Contact" },
 ];
@@ -47,9 +47,8 @@ const COMPTE = [
 ];
 
 const AGES = [
-  { key: "0-1" as const, label: "Bébé", hint: "0 à 1 an" },
   { key: "2-10" as const, label: "Enfant", hint: "2 à 10 ans" },
-  { key: "10-15" as const, label: "Grand", hint: "10 à 15 ans" },
+  { key: "11-14" as const, label: "Grand", hint: "11 à 14 ans" },
 ];
 
 /** La pièce mise en avant dans le menu déroulant. */

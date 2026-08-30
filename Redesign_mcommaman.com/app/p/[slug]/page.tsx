@@ -4,11 +4,10 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CartDrawer } from "@/components/cart-drawer";
 import { ProductDetail } from "@/components/product-detail";
-import { PRODUCTS, bySlug } from "@/lib/products";
+import { lireFiche, lireSimilaires } from "@/lib/catalogue";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
-}
+/* Plus de pré-génération : les fiches viennent de la base, et une fiche
+   publiée après la construction du site doit être visible tout de suite. */
 
 export async function generateMetadata({
   params,
@@ -16,8 +15,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = bySlug(slug);
-  if (!product) return { title: "Produit introuvable" };
+  const fiche = await lireFiche(slug);
+  if (!fiche) return { title: "Produit introuvable" };
+  const product = fiche.produit;
   return {
     title: product.name,
     description: product.description,
@@ -27,8 +27,10 @@ export async function generateMetadata({
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = bySlug(slug);
-  if (!product) notFound();
+  const fiche = await lireFiche(slug);
+  if (!fiche) notFound();
+  const product = fiche.produit;
+  const similaires = await lireSimilaires(slug);
 
   // Donnée structurée : absente de l'ancien site (défaut #19).
   const jsonLd = {
@@ -36,7 +38,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
     "@type": "Product",
     name: product.name,
     description: product.description,
-    sku: product.sku,
+    sku: fiche.brut.variantes?.[0]?.sku ?? "",
     image: [product.image],
     brand: { "@type": "Brand", name: "M comme Maman" },
     offers: {
@@ -54,7 +56,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Header />
       <main>
-        <ProductDetail product={product} />
+        <ProductDetail product={product} fiche={fiche.brut} similaires={similaires} />
       </main>
       <Footer />
       <CartDrawer />

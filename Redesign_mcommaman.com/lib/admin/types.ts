@@ -73,7 +73,6 @@ export interface Customer {
   phone: string;
   city: string;
   createdAt: string;
-  marketingOptIn: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,10 +88,15 @@ export interface AdminCategory {
   /** Visuel du rayon, affiché en boutique. */
   image: string;
   /**
-   * Rayons apparentés, par slug. La relation est symétrique : « Chaussures »
-   * liée à « Robes & jupes » apparaît aussi dans les rayons liés de celle-ci.
+   * Les catégories qui la contiennent, par slug. Vide pour une catégorie de
+   * premier niveau. Plusieurs, parce qu'une sous-catégorie peut se ranger à
+   * deux endroits — « Chaussures » sous « Enfants » et sous « Coin Maman ».
    */
-  links: string[];
+  parentSlugs: string[];
+  /** Leurs libellés, pour les afficher sans les rechercher. */
+  parentNoms: string[];
+  /** Le monde où elle se montre : vestiaire enfant ou coin maman. */
+  univers: "enfant" | "maman";
   active: boolean;
   order: number;
 }
@@ -245,9 +249,8 @@ export interface HeroConfig {
 
 /** Filtres d'âge et de genre, repris du catalogue pour les formulaires. */
 export const AGES: { value: Age; label: string }[] = [
-  { value: "0-1", label: "0 à 1 an" },
   { value: "2-10", label: "2 à 10 ans" },
-  { value: "10-15", label: "10 à 15 ans" },
+  { value: "11-14", label: "11 à 14 ans" },
 ];
 
 export const GENDERS: { value: Gender; label: string }[] = [

@@ -15,7 +15,7 @@ type Champ = "nom" | "tel" | "email" | "ville" | "repere";
 
 export function Checkout({ startAt = 1 }: { startAt?: number }) {
   const router = useRouter();
-  const { items, subtotal, bump, remove, optionLabel, clear } = useCart();
+  const { lignes, subtotal, complet, bump, remove, clear } = useCart();
   const { account, defaultAddress } = useAuth();
   const { placeOrder } = useOrders();
 
@@ -99,7 +99,7 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
   };
 
   const valider = () => {
-    if (items.length === 0) return;
+    if (lignes.length === 0) return;
 
     if (step === 1) {
       setStep(2);
@@ -127,16 +127,15 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
        prestataire qui validera — jamais ce retour-ci. */
     setEnvoi(true);
     const commande = placeOrder({
-      lines: items.map((i) => ({
-        productId: i.id,
-        slug: i.slug,
-        name: i.name,
-        image: i.image,
-        color: i.color,
-        size: i.size,
-        option: optionLabel({ id: i.id, qty: i.qty, color: i.color, size: i.size }),
-        price: i.price,
-        quantity: i.qty,
+      lines: lignes.map((l) => ({
+        productId: String(l.produit),
+        slug: l.slug,
+        name: l.nom,
+        image: l.image,
+        variante: l.variante,
+        option: l.option,
+        price: l.prix_unitaire,
+        quantity: l.quantite,
       })),
       subtotal,
       shipping,
@@ -207,7 +206,7 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
               </h1>
               <p className="mb-6 mt-1.5 text-sm text-muted">Commande possible sans créer de compte.</p>
 
-              {items.length === 0 ? (
+              {lignes.length === 0 ? (
                 <div className="rounded-[20px] border border-dashed border-[#e5d9de] p-14 text-center">
                   <div className="text-base font-bold">Votre panier est vide</div>
                   <p className="mt-2 text-sm text-muted">Tout est en français, y compris les états vides.</p>
@@ -220,34 +219,41 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {items.map((i) => (
+                  {lignes.map((l) => (
                     <div
-                      key={`${i.id}-${i.color}-${i.size}`}
+                      key={l.id}
                       className="flex gap-4.5 rounded-[20px] border border-line p-4"
                     >
                       <div
                         className="h-28 w-23 shrink-0 rounded-2xl bg-stone bg-cover bg-center"
-                        style={{ backgroundImage: `url(${i.image})` }}
+                        style={{ backgroundImage: `url(${l.image})` }}
                       />
                       <div className="flex-1">
                         <div className="flex justify-between gap-4">
                           <div>
-                            <div className="text-[15px] font-bold">{i.name}</div>
-                            <div className="mt-1 text-[13px] text-muted">
-                              {optionLabel({ id: i.id, qty: i.qty, color: i.color, size: i.size })}
-                            </div>
+                            <div className="text-[15px] font-bold">{l.nom}</div>
+                            <div className="mt-1 text-[13px] text-muted">{l.option}</div>
+                            {/* Une ligne devenue inservable se signale plutôt que
+                                de disparaître : la caisse la refuserait sans dire pourquoi. */}
+                            {!l.disponible && (
+                              <div className="mt-1.5 text-[12.5px] font-semibold text-rose-deep">
+                                {l.stock_restant > 0
+                                  ? `Il n'en reste que ${l.stock_restant}`
+                                  : "Épuisé pour le moment"}
+                              </div>
+                            )}
                           </div>
-                          <button onClick={() => remove(i.id)} className="text-[13px] text-[#9c8d93]">
+                          <button onClick={() => remove(l.id)} className="text-[13px] text-[#9c8d93]">
                             Retirer
                           </button>
                         </div>
                         <div className="mt-4 flex items-center justify-between">
                           <span className="flex items-center gap-4 rounded-full border-[1.5px] border-[#e5d9de] px-3.5 py-1.5 text-sm font-semibold">
-                            <button onClick={() => bump(i.id, -1)} aria-label="Retirer un">−</button>
-                            <span className="tabular-nums">{i.qty}</span>
-                            <button onClick={() => bump(i.id, 1)} aria-label="Ajouter un">+</button>
+                            <button onClick={() => bump(l.id, -1)} aria-label="Retirer un">−</button>
+                            <span className="tabular-nums">{l.quantite}</span>
+                            <button onClick={() => bump(l.id, 1)} aria-label="Ajouter un">+</button>
                           </span>
-                          <span className="text-base font-extrabold">{formatXOF(i.price * i.qty)}</span>
+                          <span className="text-base font-extrabold">{formatXOF(l.sous_total)}</span>
                         </div>
                       </div>
                     </div>
@@ -511,7 +517,7 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
 
           <button
             onClick={valider}
-            disabled={items.length === 0}
+            disabled={lignes.length === 0 || !complet}
             className="mt-5 w-full rounded-full bg-rose py-4 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(224,65,127,.65)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
           >
             {cta}
@@ -519,12 +525,17 @@ export function Checkout({ startAt = 1 }: { startAt?: number }) {
 
           {/* Un bouton grisé sans explication laisse croire à une panne : on dit
               pourquoi il ne part pas. */}
-          {items.length === 0 ? (
+          {lignes.length === 0 ? (
             <p className="mt-3 text-center text-[12.5px] font-semibold text-rose-deep">
               Votre panier est vide, il n&apos;y a rien à commander.{" "}
               <Link href="/boutique" className="underline underline-offset-2">
                 Voir la sélection
               </Link>
+            </p>
+          ) : !complet ? (
+            <p className="mt-3 text-center text-[12.5px] font-semibold text-rose-deep">
+              Un article de votre panier n&apos;est plus servable. Ajustez la quantité ou
+              retirez-le pour continuer.
             </p>
           ) : (
             tente &&

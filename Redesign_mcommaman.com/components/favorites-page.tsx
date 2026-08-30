@@ -14,7 +14,7 @@ const SHELL = "mx-auto w-full max-w-[1400px] px-5 md:px-8 lg:px-10";
 
 export function FavoritesPage() {
   const { ids, clear, hydrated } = useFavorites();
-  const { add } = useCart();
+  const { addBySlug } = useCart();
   const [quick, setQuick] = useState<Product | null>(null);
   const [confirmeVidage, setConfirmeVidage] = useState(false);
   const [ajoutes, setAjoutes] = useState(false);
@@ -30,8 +30,8 @@ export function FavoritesPage() {
   const total = favoris.reduce((somme, p) => somme + p.price, 0);
 
   const toutAjouter = () => {
-    /* `add` ouvre déjà le tiroir : la confirmation du bouton sert quand on le referme. */
-    for (const p of disponibles) add(p.id);
+    /* L'ajout ouvre déjà le tiroir : la confirmation du bouton sert quand on le referme. */
+    for (const p of disponibles) addBySlug(p.slug);
     setAjoutes(true);
     window.setTimeout(() => setAjoutes(false), 2400);
   };
@@ -46,8 +46,8 @@ export function FavoritesPage() {
           Mes favoris
         </h1>
         <p className="mx-auto mt-2.5 max-w-[54ch] text-[14.5px] leading-relaxed text-muted text-pretty">
-          Les pièces mises de côté, gardées dans ce navigateur en attendant la bonne taille ou le
-          bon moment.
+          Les pièces mises de côté en attendant la bonne taille ou le bon moment. Une fois
+          connectée, elles vous suivent d&apos;un appareil à l&apos;autre.
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export function FavoritesPage() {
               <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
             </Link>
             <Link
-              href="/boutique?age=0-1"
+              href="/boutique?age=2-10"
               className="inline-flex items-center justify-center rounded-full border-[1.5px] border-[#e5d9de] bg-white px-7 py-3.5 text-[14px] font-bold transition-colors duration-300 hover:border-rose hover:text-rose"
             >
               Voir le rayon bébé

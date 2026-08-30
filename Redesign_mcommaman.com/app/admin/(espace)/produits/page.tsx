@@ -9,7 +9,6 @@ import type { AdminProduct, ProductStatus } from "@/lib/admin/types";
 import {
   Button,
   DeleteButton,
-  Note,
   PageHeader,
   Pills,
   ProductChip,
@@ -56,7 +55,10 @@ export default function Page() {
           p.sku.toLowerCase().includes(q) ||
           p.category.toLowerCase().includes(q)
       )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      /* Par date de création, de la plus récente à la plus ancienne. Trier sur
+         la date de modification remonterait la fiche en tête à chaque stock
+         corrigé, et la liste bougerait sous le curseur pendant un inventaire. */
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [products, filtre, recherche]);
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture du catalogue…</p>;
@@ -194,14 +196,6 @@ export default function Page() {
           </span>,
         ]}
       />
-
-      <div className="mt-4">
-        <Note>
-          Le catalogue de la vitrine (<code>lib/products.ts</code>) reste un tableau statique : ce
-          que l&apos;on modifie ici ne s&apos;y reporte pas encore. Les deux se rejoindront quand
-          les fiches viendront de la base.
-        </Note>
-      </div>
     </>
   );
 }

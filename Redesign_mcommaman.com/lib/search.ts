@@ -1,4 +1,4 @@
-import { PRODUCTS, CATEGORIES, type Product } from "./products";
+import { TOUS_PRODUITS, PRODUCTS, CATEGORIES, type Product } from "./products";
 
 /**
  * Recherche de la boutique.
@@ -59,13 +59,12 @@ const mots = (valeur: string) =>
     .map((mot) => SYNONYMES[mot] ?? mot);
 
 /** Comment on parle d'un âge quand on ne connaît pas le code interne. */
-const AGE_MOTS: Record<Product["age"], string> = {
-  "0-1": "bebe 0 1 an naissance nourrisson",
+const AGE_MOTS: Record<string, string> = {
   "2-10": "enfant 2 10 ans petite maternelle primaire",
-  "10-15": "grand ado 10 15 ans preado college",
+  "11-14": "grand ado 11 14 ans preado college",
 };
 
-const GENRE_MOTS: Record<Product["gender"], string> = {
+const GENRE_MOTS: Record<string, string> = {
   fille: "fille filles",
   garcon: "garcon garcons",
   mixte: "mixte fille garcon unisexe",
@@ -80,11 +79,15 @@ interface Fiche {
 }
 
 /** Index construit une seule fois, au chargement du module. */
-const INDEX: Fiche[] = PRODUCTS.map((product) => ({
+/* Les deux univers sont cherchables : une maman qui tape « bazin » doit le
+   trouver depuis la barre de recherche, pas seulement depuis sa page. */
+const INDEX: Fiche[] = TOUS_PRODUITS.map((product) => ({
   product,
   nom: normaliser(product.name),
   rayon: normaliser(product.category),
-  contexte: normaliser(`${AGE_MOTS[product.age]} ${GENRE_MOTS[product.gender]}`),
+  contexte: normaliser(
+    `${AGE_MOTS[product.age ?? ""] ?? ""} ${GENRE_MOTS[product.gender ?? ""] ?? ""} ${product.univers === "maman" ? "maman tissu voile couture" : ""}`,
+  ),
   reste: normaliser(`${product.description} ${product.sku} ${product.slug}`),
 }));
 

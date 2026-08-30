@@ -6,11 +6,26 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
-const CLE_FAVORIS = "mcm-favoris-v1";
+import { envoyer } from "@/lib/api";
+import { useAuth } from "./auth-context";
+
+/**
+ * Les articles mis de côté.
+ *
+ * Deux régimes, et c'est voulu : tant que la visiteuse n'est pas connectée, ses
+ * favoris restent dans son navigateur — lui demander un compte pour cliquer sur
+ * un cœur ferait perdre le geste. À la connexion, ils remontent au serveur et
+ * la suivent d'un appareil à l'autre.
+ */
+
+const CLE_LOCALE = "mcm-favoris-v1";
+
+type FavoriApi = { id: number; produit: number };
 
 type Ctx = {
   /** Identifiants des articles mis de côté, du plus récent au plus ancien. */
@@ -24,100 +39,116 @@ type Ctx = {
   hydrated: boolean;
 };
 
-const FavoritesContext = createContext<Ctx | null>(null);
+const FavCtx = createContext<Ctx | null>(null);
 
-/* Le stockage peut contenir n'importe quoi — une version antérieure, une main
-   qui a édité la clé. On ne garde que des chaînes. */
-function lireIds(brut: string | null): string[] | null {
-  if (!brut) return null;
+function lireLocal(): string[] {
   try {
-    const lu: unknown = JSON.parse(brut);
-    if (!Array.isArray(lu)) return null;
-    return lu.filter((v): v is string => typeof v === "string");
+    const brut = window.localStorage.getItem(CLE_LOCALE);
+    return brut ? (JSON.parse(brut) as string[]) : [];
   } catch {
-    return null;
+    return [];
+  }
+}
+
+function ecrireLocal(ids: string[]) {
+  try {
+    window.localStorage.setItem(CLE_LOCALE, JSON.stringify(ids));
+  } catch {
+    /* stockage plein ou refusé : la session reste utilisable */
   }
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
+  const { account, hydrated: authPrete } = useAuth();
   const [ids, setIds] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const fusionFaite = useRef(false);
 
-  /* Lecture différée : le premier rendu doit rester identique côté serveur et
-     client, comme pour le panier, les comptes, les commandes et les avis. */
+  const connectee = Boolean(account);
+
+  /* Lecture initiale, puis bascule quand la session change. */
   useEffect(() => {
-    try {
-      const lu = lireIds(window.localStorage.getItem(CLE_FAVORIS));
-      if (lu) setIds(lu);
-    } catch {
-      /* stockage indisponible : on repart d'une liste vide */
+    if (!authPrete) return;
+
+    if (!connectee) {
+      setIds(lireLocal());
+      setHydrated(true);
+      fusionFaite.current = false;
+      return;
     }
-    setHydrated(true);
-  }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(CLE_FAVORIS, JSON.stringify(ids));
-    } catch {
-      /* quota dépassé : la liste reste affichée, seule la persistance est perdue */
-    }
-  }, [ids, hydrated]);
+    // À la première connexion de cette session, on fait remonter ce que le
+    // navigateur gardait. Le serveur ajoute sans jamais effacer.
+    const locaux = fusionFaite.current ? [] : lireLocal();
+    fusionFaite.current = true;
 
-  /* Un cœur touché dans un autre onglet se voit ici : c'est le même geste que
-     pour la session du compte. */
-  useEffect(() => {
-    const surStockage = (e: StorageEvent) => {
-      if (e.key !== CLE_FAVORIS) return;
-      const lu = lireIds(e.newValue);
-      setIds(lu ?? []);
-    };
-    window.addEventListener("storage", surStockage);
-    return () => window.removeEventListener("storage", surStockage);
-  }, []);
+    const charger = locaux.length
+      ? envoyer<FavoriApi[]>("/api/compte/favoris/fusionner/", "POST", {
+          produits: locaux.map(Number).filter(Number.isFinite),
+        })
+      : envoyer<{ results: FavoriApi[] }>("/api/compte/favoris/").then((page) => page.results);
 
-  /* Le dernier ajouté passe en tête : la liste se lit comme un fil, du plus
-     récent au plus ancien. */
-  const toggle = useCallback((id: string) => {
-    setIds((liste) => (liste.includes(id) ? liste.filter((v) => v !== id) : [id, ...liste]));
-  }, []);
+    charger
+      .then((liste) => {
+        setIds(liste.map((f) => String(f.produit)));
+        // Le navigateur n'a plus à les garder : le serveur fait foi.
+        ecrireLocal([]);
+      })
+      .catch(() => setIds(lireLocal()))
+      .finally(() => setHydrated(true));
+  }, [authPrete, connectee]);
 
-  const remove = useCallback((id: string) => {
-    setIds((liste) => liste.filter((v) => v !== id));
-  }, []);
+  const isFavorite = useCallback((id: string) => ids.includes(id), [ids]);
 
-  const clear = useCallback(() => setIds([]), []);
+  const toggle = useCallback<Ctx["toggle"]>(
+    (id) => {
+      const present = ids.includes(id);
+      const suivant = present ? ids.filter((x) => x !== id) : [id, ...ids];
+      setIds(suivant);
 
-  const value = useMemo<Ctx>(
-    () => ({
-      ids,
-      isFavorite: (id: string) => ids.includes(id),
-      toggle,
-      remove,
-      clear,
-      count: ids.length,
-      hydrated,
-    }),
-    [ids, toggle, remove, clear, hydrated]
+      if (!connectee) {
+        ecrireLocal(suivant);
+        return;
+      }
+      const appel = present
+        ? envoyer(`/api/compte/favoris/produit/${id}/`, "DELETE")
+        : envoyer("/api/compte/favoris/", "POST", { produit: Number(id) });
+      // L'écran a déjà bougé : en cas d'échec on remet l'état précédent plutôt
+      // que de laisser croire à un enregistrement qui n'a pas eu lieu.
+      appel.catch(() => setIds(ids));
+    },
+    [ids, connectee],
   );
 
-  return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;
+  const remove = useCallback<Ctx["remove"]>(
+    (id) => {
+      if (ids.includes(id)) toggle(id);
+    },
+    [ids, toggle],
+  );
+
+  const clear = useCallback(() => {
+    const precedents = ids;
+    setIds([]);
+    if (!connectee) {
+      ecrireLocal([]);
+      return;
+    }
+    Promise.all(
+      precedents.map((id) => envoyer(`/api/compte/favoris/produit/${id}/`, "DELETE")),
+    ).catch(() => setIds(precedents));
+  }, [ids, connectee]);
+
+  const valeur = useMemo<Ctx>(
+    () => ({ ids, isFavorite, toggle, remove, clear, count: ids.length, hydrated }),
+    [ids, isFavorite, toggle, remove, clear, hydrated],
+  );
+
+  return <FavCtx.Provider value={valeur}>{children}</FavCtx.Provider>;
 }
 
 export function useFavorites(): Ctx {
-  const ctx = useContext(FavoritesContext);
-  if (!ctx) throw new Error("useFavorites doit être utilisé dans <FavoritesProvider>");
+  const ctx = useContext(FavCtx);
+  if (!ctx) throw new Error("useFavorites doit être utilisé à l'intérieur de <FavoritesProvider>");
   return ctx;
 }
-
-/**
- * Note — les favoris vivent dans le navigateur.
- *
- * La liste ne suit pas le compte : ouverte sur un autre téléphone, elle est
- * vide, même connectée. C'est la limite assumée d'une vitrine sans serveur.
- *
- * En ligne, la table est courte — `(compte, produit, date)`, une contrainte
- * d'unicité — et la liste du navigateur se fond dedans à la connexion plutôt
- * que de l'écraser : une cliente qui a mis des pièces de côté avant de créer
- * son compte ne doit pas les perdre en le créant.
- */

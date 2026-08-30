@@ -9,18 +9,32 @@ import {
   useState,
   type ReactNode,
 } from "react";
+
+import { envoyer, televerser, type Page, type RayonApi } from "@/lib/api";
 import {
-  defaultSettings,
-  REFERENCE_DATE,
-  seedActivity,
-  seedCategories,
-  seedCustomers,
-  seedHero,
-  seedLibrary,
-  seedOrders,
-  seedProducts,
-  seedPromotions,
-} from "./seed";
+  depuisPromotion,
+  depuisProduit,
+  depuisReglages,
+  versCategorie,
+  versCliente,
+  versColoris,
+  versCommande,
+  versMedia,
+  versProduit,
+  versPromotion,
+  versReglages,
+  versTaille,
+  type CampagneApi,
+  type ClienteApi,
+  type ColorisApi,
+  type CommandeApi,
+  type MediaApi,
+  type PhotoProduitApi,
+  type ProduitGestionApi,
+  type ReglagesApi,
+  type TailleApi,
+} from "./passage";
+import { REFERENCE_DATE } from "./seed";
 import type {
   ActivityEntry,
   AdminCategory,
@@ -38,10 +52,27 @@ import type {
   StoreSettings,
 } from "./types";
 
-/** Une seule clé pour tout le back-office. */
+export { REFERENCE_DATE } from "./seed";
+
+/**
+ * La clé qui portait autrefois tout le back-office dans le navigateur.
+ *
+ * Conservée pour une seule raison : la page des réglages propose d'effacer ce
+ * qu'un ancien passage y aurait laissé. Plus rien n'y est écrit.
+ */
 export const ADMIN_STORAGE_KEY = "mcm-admin-v1";
 
-export { REFERENCE_DATE } from "./seed";
+/**
+ * L'état du back-office, tenu par le serveur.
+ *
+ * Il n'y a plus rien dans le navigateur : chaque écriture part vers
+ * `/api/gestion/`, et l'état affiché est relu ensuite. Deux postes ouverts sur
+ * la même boutique voient donc la même chose — ce qui était impossible tant
+ * que tout vivait dans `localStorage`.
+ *
+ * La surface publique n'a pas bougé : les onze pages consomment `useAdmin()`
+ * exactement comme avant.
+ */
 
 interface AdminState {
   products: AdminProduct[];
@@ -55,129 +86,37 @@ interface AdminState {
   activity: ActivityEntry[];
 }
 
-function construireGraine(): AdminState {
-  const products = seedProducts();
-  const customers = seedCustomers();
-  return {
-    products,
-    customers,
-    orders: seedOrders(products, customers),
-    categories: seedCategories(),
-    promotions: seedPromotions(),
-    library: seedLibrary(),
-    settings: defaultSettings,
-    hero: seedHero(),
-    activity: seedActivity(),
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* Migration de l'état enregistré                                      */
-/* ------------------------------------------------------------------ */
-
-function convertirTexte(brut: string): SizeValue {
-  const texte = brut.trim();
-  const ans = texte.match(/^(\d+)\s*ans$/i);
-  if (ans) return { value: ans[1], age: texte };
-  const plage = texte.match(/^(\d+)\s*-\s*(\d+)\s*ans$/i);
-  if (plage) return { value: plage[2], age: texte };
-  const intervalle = texte.match(/^(\d+)\s*-\s*(\d+)\s*mois$/i);
-  if (intervalle) return { value: `${intervalle[2]}M`, age: texte };
-  const mois = texte.match(/^(\d+)\s*m(ois)?$/i);
-  if (mois) return { value: `${mois[1]}M`, age: texte };
-  if (/^taille unique$/i.test(texte)) return { value: "TU", age: "Taille unique" };
-  return { value: texte, age: "" };
-}
-
-function migrerTaille(brut: SizeValue | string): SizeValue {
-  if (typeof brut === "object" && brut !== null) {
-    const value = String(brut.value ?? "");
-    const age = String(brut.age ?? "");
-    return age ? { value, age } : convertirTexte(value);
-  }
-  return convertirTexte(String(brut));
-}
-
-/**
- * Remet un état enregistré au format courant.
- *
- * Le contenu du navigateur peut avoir été écrit par une version antérieure du
- * modèle. Sans ce rattrapage, l'application lit `undefined` et la page tombe.
- * **Toute modification de `AdminState` doit passer par ici.**
- */
-function migrer(lu: Partial<AdminState>): Partial<AdminState> {
-  const graine = construireGraine();
-  const migre: Partial<AdminState> = { ...lu };
-
-  if (lu.categories) {
-    migre.categories = lu.categories.map((category, index) => ({
-      ...category,
-      image: category.image ?? "",
-      links: category.links ?? [],
-      description: category.description ?? "",
-      order: category.order ?? index + 1,
-    }));
-  }
-
-  if (lu.promotions) {
-    migre.promotions = lu.promotions.map((promotion) => ({
-      ...promotion,
-      startsAt: promotion.startsAt || new Date().toISOString().slice(0, 10),
-      durationDays:
-        Number.isFinite(promotion.durationDays) && promotion.durationDays > 0
-          ? promotion.durationDays
-          : 30,
-      target: promotion.target ?? "boutique",
-      categorySlug: promotion.categorySlug ?? "",
-      productId: promotion.productId ?? "",
-      orderRule: promotion.orderRule ?? "premiere-commande",
-      minAmount: promotion.minAmount ?? 0,
-      description: promotion.description ?? "",
-    }));
-  }
-
-  if (lu.products) {
-    migre.products = lu.products.map((product) => ({
-      ...product,
-      gallery: product.gallery ?? [],
-      colors: product.colors ?? [],
-      sizes: product.sizes ?? [],
-      stock: Number.isFinite(product.stock) ? product.stock : 0,
-      status: product.status ?? "brouillon",
-    }));
-  }
-
-  const bibliotheque = lu.library as Partial<ProductLibrary> | undefined;
-  migre.library = {
-    sizes: bibliotheque?.sizes
-      ? [
-          ...new Map(
-            bibliotheque.sizes.map(migrerTaille).map((t) => [t.value, t]),
-          ).values(),
-        ]
-      : graine.library.sizes,
-    sizeGuide: bibliotheque?.sizeGuide ?? "",
-    colors: bibliotheque?.colors ?? graine.library.colors,
-    materials: bibliotheque?.materials ?? graine.library.materials,
-    media: bibliotheque?.media ?? graine.library.media,
-  };
-
-  migre.hero = {
-    custom: lu.hero?.custom ?? false,
-    slides: lu.hero?.slides?.length ? lu.hero.slides : graine.hero.slides,
-  };
-
-  migre.settings = { ...graine.settings, ...lu.settings };
-
-  return migre;
-}
-
-/* ------------------------------------------------------------------ */
-/* Contexte                                                            */
-/* ------------------------------------------------------------------ */
+const VIDE: AdminState = {
+  products: [],
+  orders: [],
+  customers: [],
+  categories: [],
+  promotions: [],
+  library: { sizes: [], sizeGuide: "", colors: [], materials: [], media: [] },
+  settings: {
+    storeName: "M comme Maman",
+    tagline: "",
+    contactEmail: "",
+    phone: "",
+    currency: "F",
+    freeShippingThreshold: 25000,
+    shippingDakar: 2000,
+    shippingRegions: 3500,
+    lowStockThreshold: 6,
+    acceptOrders: true,
+    showPromoBanner: true,
+    promoBannerText: "",
+  },
+  hero: { custom: false, slides: [] },
+  activity: [],
+};
 
 interface AdminContextValue extends AdminState {
   hydrated: boolean;
+  /** Vrai le temps d'une écriture : les boutons peuvent se désactiver. */
+  enCours: boolean;
+  /** Le dernier refus du serveur, en clair. */
+  erreur: string;
   /* Produits */
   saveProduct: (product: AdminProduct) => void;
   createProduct: (product: AdminProduct) => void;
@@ -200,6 +139,8 @@ interface AdminContextValue extends AdminState {
   deleteColor: (id: string) => void;
   setMaterials: (materials: string[]) => void;
   addMedia: (items: Pick<MediaItem, "src" | "name">[]) => void;
+  /** Envoie un fichier à la photothèque et renvoie l'image créée. */
+  televerserMedia: (fichier: File, nom?: string) => Promise<MediaItem | null>;
   removeMedia: (id: string) => void;
   /* Vitrine */
   updateHero: (hero: HeroConfig) => void;
@@ -210,258 +151,459 @@ interface AdminContextValue extends AdminState {
 
 const AdminContext = createContext<AdminContextValue | null>(null);
 
+/** Une liste paginée dont on ne veut que le contenu. */
+const contenu = <T,>(page: Page<T> | T[] | null): T[] =>
+  Array.isArray(page) ? page : (page?.results ?? []);
+
+/**
+ * Toutes les lignes d'une collection paginée.
+ *
+ * Le back-office calcule des totaux et des segments : une page de moins et le
+ * chiffre d'affaires est faux, les clientes fidèles disparaissent, et rien ne
+ * signale l'écart. On suit donc `next` jusqu'au bout plutôt que d'espérer que
+ * tout tienne sur la première page.
+ *
+ * Renvoie ce qui a pu être lu si le serveur s'interrompt : mieux vaut une liste
+ * partielle qu'un back-office vide, et l'erreur remonte par ailleurs.
+ */
+async function tout<T>(chemin: string): Promise<T[]> {
+  const lignes: T[] = [];
+  let suite: string | null = chemin + (chemin.includes("?") ? "&" : "?") + "page_size=200";
+
+  try {
+    while (suite) {
+      const page: Page<T> = await envoyer<Page<T>>(suite);
+      lignes.push(...page.results);
+      // `next` est une adresse absolue : on n'en garde que le chemin, seul
+      // `lib/api` sait à quel serveur il parle.
+      suite = page.next ? new URL(page.next).pathname + new URL(page.next).search : null;
+    }
+  } catch {
+    /* interrompu : on garde ce qui est déjà arrivé */
+  }
+  return lignes;
+}
+
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AdminState>(() => construireGraine());
+  const [state, setState] = useState<AdminState>(VIDE);
   const [hydrated, setHydrated] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
 
-  // Lecture différée : le premier rendu doit rester identique serveur et client.
-  useEffect(() => {
-    try {
-      const brut = window.localStorage.getItem(ADMIN_STORAGE_KEY);
-      if (brut) {
-        const lu = JSON.parse(brut) as Partial<AdminState>;
-        setState((courant) => ({ ...courant, ...migrer(lu) }));
-      }
-    } catch {
-      /* stockage indisponible ou corrompu : on garde la démonstration */
-    }
-    setHydrated(true);
-  }, []);
+  /**
+   * Relit tout.
+   *
+   * Un seul appel groupé plutôt qu'un rechargement par domaine : le
+   * back-office se consulte d'une page à l'autre, et les compteurs de la barre
+   * latérale ont besoin des commandes même sur la page des rayons.
+   */
+  const relire = useCallback(async () => {
+    const [produits, rayons, commandes, clientes, campagnes, tailles, coloris, medias, reglages] =
+      await Promise.all([
+        tout<ProduitGestionApi>("/api/gestion/produits/"),
+        envoyer<RayonApi[]>("/api/catalogue/rayons/?tous=1").catch(() => null),
+        tout<CommandeApi>("/api/gestion/commandes/"),
+        tout<ClienteApi>("/api/gestion/clientes/"),
+        tout<CampagneApi>("/api/gestion/campagnes/"),
+        envoyer<TailleApi[]>("/api/gestion/tailles/").catch(() => null),
+        envoyer<ColorisApi[]>("/api/gestion/coloris/").catch(() => null),
+        tout<MediaApi>("/api/gestion/photheque/"),
+        // Les réglages du back-office passent par `/api/gestion/` : la route
+        // publique est en lecture seule et ne porte pas le seuil de stock bas.
+        // Réservée à la gérante — une vendeuse garde le reste du back-office.
+        envoyer<ReglagesApi>("/api/gestion/reglages/").catch(() => null),
+      ]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* quota dépassé : la session reste utilisable, seule la persistance est perdue */
-    }
-  }, [state, hydrated]);
-
-  const journal = useCallback((action: string, target: string) => {
-    setState((s) => ({
-      ...s,
-      activity: [
-        { id: `act-${Date.now()}`, at: new Date().toISOString(), author: "Vous", action, target },
-        ...s.activity,
-      ].slice(0, 40),
+    setState((courant) => ({
+      ...courant,
+      products: contenu(produits).map(versProduit),
+      categories: (rayons ?? []).map(versCategorie),
+      orders: contenu(commandes).map(versCommande),
+      customers: contenu(clientes).map(versCliente),
+      promotions: contenu(campagnes).map(versPromotion),
+      library: {
+        ...courant.library,
+        sizes: (tailles ?? []).map(versTaille),
+        colors: (coloris ?? []).map(versColoris),
+        media: contenu(medias).map(versMedia),
+      },
+      settings: reglages ? versReglages(reglages) : courant.settings,
     }));
   }, []);
 
-  /* --- Produits --- */
+  useEffect(() => {
+    relire().finally(() => setHydrated(true));
+  }, [relire]);
+
+  /**
+   * Exécute une écriture, puis relit.
+   *
+   * On relit systématiquement au lieu de deviner l'état d'arrivée : le serveur
+   * peut avoir recalculé un stock, changé un slug, refusé une publication. Ce
+   * qu'il renvoie fait foi.
+   */
+  const ecrire = useCallback(
+    async (action: () => Promise<unknown>) => {
+      setEnCours(true);
+      setErreur("");
+      try {
+        await action();
+        await relire();
+      } catch (e) {
+        setErreur(e instanceof Error ? e.message : "L'enregistrement a échoué.");
+        // On relit quand même : l'écran doit montrer l'état réel, pas celui
+        // qu'on espérait.
+        await relire();
+      } finally {
+        setEnCours(false);
+      }
+    },
+    [relire],
+  );
+
+  const rayonsParNom = useMemo(() => {
+    const table = new Map<string, number>();
+    for (const categorie of state.categories) table.set(categorie.label, Number(categorie.id));
+    return table;
+  }, [state.categories]);
+
+  /* --------------------------------------------------------- produits */
+
+  /**
+   * Range les photos d'une fiche.
+   *
+   * Elles voyagent en adresses dans le formulaire, en identifiants en base : on
+   * passe donc par la photothèque, qui les garde. Une image déjà connue n'y est
+   * pas réenregistrée — deux fiches peuvent montrer le même visuel.
+   *
+   * Sans cette étape, une fiche naissait sans aucune photo et le serveur
+   * refusait de la publier, en disant vrai.
+   */
+  const rangerPhotos = useCallback(
+    async (produitId: number, adresses: string[]) => {
+      const photothegue = new Map(
+        contenu(await envoyer<Page<MediaApi>>("/api/gestion/photheque/?page_size=500").catch(
+          () => null,
+        )).map((m) => [m.url, m.id]),
+      );
+
+      const existantes = contenu(
+        await envoyer<Page<PhotoProduitApi>>(
+          `/api/gestion/photos/?produit=${produitId}&page_size=200`,
+        ).catch(() => null),
+      ).filter((p) => p.produit === produitId);
+
+      // Ce qui n'est plus dans le formulaire quitte la fiche.
+      for (const photo of existantes) {
+        if (!adresses.includes(photo.url)) {
+          await envoyer(`/api/gestion/photos/${photo.id}/`, "DELETE").catch(() => undefined);
+        }
+      }
+
+      for (const [position, adresse] of adresses.entries()) {
+        const deja = existantes.find((p) => p.url === adresse);
+        if (deja) {
+          if (deja.position !== position) {
+            await envoyer(`/api/gestion/photos/${deja.id}/`, "PATCH", { position }).catch(
+              () => undefined,
+            );
+          }
+          continue;
+        }
+
+        let media = photothegue.get(adresse);
+        if (!media) {
+          const cree = await envoyer<MediaApi>("/api/gestion/photheque/", "POST", {
+            url: adresse,
+            nom: adresse.split("/").pop() ?? "Visuel",
+          }).catch(() => null);
+          if (!cree) continue;
+          media = cree.id;
+          photothegue.set(adresse, cree.id);
+        }
+
+        await envoyer("/api/gestion/photos/", "POST", {
+          produit: produitId,
+          media,
+          position,
+        }).catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   const saveProduct = useCallback<AdminContextValue["saveProduct"]>(
-    (product) => {
-      setState((s) => ({
-        ...s,
-        products: s.products.map((p) =>
-          p.id === product.id ? { ...product, updatedAt: new Date().toISOString() } : p,
-        ),
-      }));
-      journal("a mis à jour", product.name);
-    },
-    [journal],
+    (produit) =>
+      void ecrire(async () => {
+        await envoyer(
+          `/api/gestion/produits/${produit.id}/`,
+          "PATCH",
+          depuisProduit(produit, rayonsParNom),
+        );
+        await rangerPhotos(Number(produit.id), [produit.image, ...produit.gallery].filter(Boolean));
+      }),
+    [ecrire, rayonsParNom],
   );
 
   const createProduct = useCallback<AdminContextValue["createProduct"]>(
-    (product) => {
-      setState((s) => ({ ...s, products: [product, ...s.products] }));
-      journal("a créé", product.name);
-    },
-    [journal],
+    (produit) =>
+      void ecrire(async () => {
+        const cree = await envoyer<{ id: number }>(
+          "/api/gestion/produits/",
+          "POST",
+          depuisProduit(produit, rayonsParNom),
+        );
+        // La fiche existe avant ses photos : elles ont besoin de son identifiant.
+        await rangerPhotos(cree.id, [produit.image, ...produit.gallery].filter(Boolean));
+      }),
+    [ecrire, rayonsParNom, rangerPhotos],
   );
 
-  const deleteProduct = useCallback<AdminContextValue["deleteProduct"]>((id) => {
-    setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
-  }, []);
+  const deleteProduct = useCallback<AdminContextValue["deleteProduct"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/produits/${id}/`, "DELETE")),
+    [ecrire],
+  );
 
-  const duplicateProduct = useCallback<AdminContextValue["duplicateProduct"]>((id) => {
-    setState((s) => {
-      const source = s.products.find((p) => p.id === id);
-      if (!source) return s;
-      const suffixe = Date.now().toString(36);
-      const copie: AdminProduct = {
-        ...source,
-        id: `${source.id}-copie-${suffixe}`,
-        slug: `${source.slug}-copie-${suffixe}`,
-        name: `${source.name} (copie)`,
-        sku: `${source.sku}-C`,
-        status: "brouillon",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      return { ...s, products: [copie, ...s.products] };
-    });
-  }, []);
+  const duplicateProduct = useCallback<AdminContextValue["duplicateProduct"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/produits/${id}/dupliquer/`, "POST")),
+    [ecrire],
+  );
 
-  const setProductStatus = useCallback<AdminContextValue["setProductStatus"]>((id, status) => {
-    setState((s) => ({
-      ...s,
-      products: s.products.map((p) =>
-        p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p,
+  const setProductStatus = useCallback<AdminContextValue["setProductStatus"]>(
+    (id, statut) => {
+      // Publier passe par l'action dédiée : c'est elle qui refait le contrôle
+      // des cinq conditions et refuse une fiche incomplète.
+      const chemin =
+        statut === "publie"
+          ? `/api/gestion/produits/${id}/publier/`
+          : statut === "archive"
+            ? `/api/gestion/produits/${id}/archiver/`
+            : null;
+      void ecrire(() =>
+        chemin
+          ? envoyer(chemin, "POST")
+          : envoyer(`/api/gestion/produits/${id}/`, "PATCH", { statut }),
+      );
+    },
+    [ecrire],
+  );
+
+  const setStock = useCallback<AdminContextValue["setStock"]>(
+    (id, stock) => {
+      // Le stock vit sur la variante. Sans variante unique, on ne devine pas
+      // laquelle ajuster : la page des variantes s'en charge.
+      const produit = state.products.find((p) => p.id === id);
+      const ecart = stock - (produit?.stock ?? 0);
+      if (!produit || ecart === 0) return;
+      void ecrire(async () => {
+        const variantes = await envoyer<Page<{ id: number }>>(
+          `/api/gestion/variantes/?produit=${id}`,
+        );
+        const premiere = contenu(variantes)[0];
+        if (!premiere) throw new Error("Cette fiche n'a pas encore de variante.");
+        return envoyer(`/api/gestion/variantes/${premiere.id}/ajuster/`, "POST", {
+          quantite: ecart,
+          motif: "ajustement",
+        });
+      });
+    },
+    [ecrire, state.products],
+  );
+
+  /* -------------------------------------------------------- commandes */
+
+  const setOrderStatus = useCallback<AdminContextValue["setOrderStatus"]>(
+    (ref, statut) =>
+      void ecrire(() =>
+        statut === "annulee"
+          ? envoyer(`/api/gestion/commandes/${ref}/annuler/`, "POST")
+          : envoyer(`/api/gestion/commandes/${ref}/avancer/`, "POST"),
       ),
-    }));
-  }, []);
+    [ecrire],
+  );
 
-  const setStock = useCallback<AdminContextValue["setStock"]>((id, stock) => {
-    setState((s) => ({
-      ...s,
-      products: s.products.map((p) => (p.id === id ? { ...p, stock: Math.max(0, stock) } : p)),
-    }));
-  }, []);
-
-  /* --- Commandes --- */
-
-  const setOrderStatus = useCallback<AdminContextValue["setOrderStatus"]>((id, status) => {
-    setState((s) => ({ ...s, orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) }));
-  }, []);
-
-  /* --- Rayons --- */
+  /* ----------------------------------------------------------- rayons */
 
   const saveCategory = useCallback<AdminContextValue["saveCategory"]>(
-    (category) => {
-      setState((s) => {
-        const liste = s.categories.some((item) => item.id === category.id)
-          ? s.categories.map((item) => (item.id === category.id ? category : item))
-          : [...s.categories, category];
+    (categorie) => {
+      // Les parentes voyagent par identifiant. Le serveur refuse qu'une
+      // sous-catégorie en porte une autre : deux niveaux suffisent, et il ne
+      // prend pas notre mot pour argent comptant.
+      const parents = (categorie.parentSlugs ?? [])
+        .map((slug) => state.categories.find((c) => c.slug === slug))
+        .filter((c): c is AdminCategory => Boolean(c))
+        .map((c) => Number(c.id));
 
-        /* Le lien est symétrique : si « Chaussures » pointe vers « Robes »,
-           « Robes » doit pointer vers « Chaussures », sinon les deux rayons
-           racontent des choses différentes. */
-        const categories = liste.map((item) => {
-          if (item.slug === category.slug) return item;
-          const doitEtreLie = (category.links ?? []).includes(item.slug);
-          const estLie = (item.links ?? []).includes(category.slug);
-          if (doitEtreLie === estLie) return item;
-          return {
-            ...item,
-            links: doitEtreLie
-              ? [...(item.links ?? []), category.slug]
-              : (item.links ?? []).filter((slug) => slug !== category.slug),
-          };
-        });
-
-        return { ...s, categories };
-      });
-      journal("a enregistré le rayon", category.label);
+      const corps = {
+        nom: categorie.label,
+        description: categorie.description,
+        visible: categorie.active,
+        ordre: categorie.order,
+        image: categorie.image ? undefined : null,
+        parents,
+      };
+      void ecrire(() =>
+        state.categories.some((c) => c.id === categorie.id)
+          ? envoyer(`/api/gestion/rayons/${categorie.id}/`, "PATCH", corps)
+          : envoyer("/api/gestion/rayons/", "POST", corps),
+      );
     },
-    [journal],
+    [ecrire, state.categories],
   );
 
-  const deleteCategory = useCallback<AdminContextValue["deleteCategory"]>((id) => {
-    setState((s) => ({ ...s, categories: s.categories.filter((item) => item.id !== id) }));
-  }, []);
+  const deleteCategory = useCallback<AdminContextValue["deleteCategory"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/rayons/${id}/`, "DELETE")),
+    [ecrire],
+  );
 
-  /* --- Promotions --- */
+  /* ------------------------------------------------------- promotions */
 
   const savePromotion = useCallback<AdminContextValue["savePromotion"]>(
     (promotion) => {
-      setState((s) => ({
-        ...s,
-        promotions: s.promotions.some((item) => item.id === promotion.id)
-          ? s.promotions.map((item) => (item.id === promotion.id ? promotion : item))
-          : [promotion, ...s.promotions],
-      }));
-      journal("a enregistré la campagne", promotion.name);
+      const corps = depuisPromotion(promotion);
+      void ecrire(() =>
+        state.promotions.some((p) => p.id === promotion.id)
+          ? envoyer(`/api/gestion/campagnes/${promotion.id}/`, "PATCH", corps)
+          : envoyer("/api/gestion/campagnes/", "POST", corps),
+      );
     },
-    [journal],
+    [ecrire, state.promotions],
   );
 
-  const deletePromotion = useCallback<AdminContextValue["deletePromotion"]>((id) => {
-    setState((s) => ({ ...s, promotions: s.promotions.filter((item) => item.id !== id) }));
-  }, []);
+  const deletePromotion = useCallback<AdminContextValue["deletePromotion"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/campagnes/${id}/`, "DELETE")),
+    [ecrire],
+  );
 
-  /* --- Bibliothèque --- */
-
-  const majBibliotheque = useCallback((patch: Partial<ProductLibrary>) => {
-    setState((s) => ({ ...s, library: { ...s.library, ...patch } }));
-  }, []);
+  /* ----------------------------------------------------- bibliothèque */
 
   const saveSizes = useCallback<AdminContextValue["saveSizes"]>(
-    (sizes) => majBibliotheque({ sizes }),
-    [majBibliotheque],
+    (tailles) => {
+      // La liste envoyée fait foi : on crée ce qui manque, on retire le reste.
+      const avant = new Map(state.library.sizes.map((t) => [t.value, t]));
+      const apres = new Map(tailles.map((t) => [t.value, t]));
+      void ecrire(async () => {
+        for (const [valeur, taille] of apres) {
+          if (!avant.has(valeur)) {
+            await envoyer("/api/gestion/tailles/", "POST", {
+              valeur,
+              repere: taille.age,
+              ordre: tailles.indexOf(taille),
+            });
+          }
+        }
+        const restantes = await envoyer<TailleApi[]>("/api/gestion/tailles/");
+        for (const existante of restantes ?? []) {
+          if (!apres.has(existante.valeur)) {
+            await envoyer(`/api/gestion/tailles/${existante.id}/`, "DELETE");
+          }
+        }
+      });
+    },
+    [ecrire, state.library.sizes],
   );
 
   const setSizeGuide = useCallback<AdminContextValue["setSizeGuide"]>(
-    (sizeGuide) => majBibliotheque({ sizeGuide }),
-    [majBibliotheque],
+    (src) =>
+      setState((courant) => ({
+        ...courant,
+        library: { ...courant.library, sizeGuide: src },
+      })),
+    [],
   );
 
-  const saveColor = useCallback<AdminContextValue["saveColor"]>((color) => {
-    setState((s) => ({
-      ...s,
-      library: {
-        ...s.library,
-        colors: s.library.colors.some((item) => item.id === color.id)
-          ? s.library.colors.map((item) => (item.id === color.id ? color : item))
-          : [...s.library.colors, color],
-      },
-    }));
-  }, []);
+  const saveColor = useCallback<AdminContextValue["saveColor"]>(
+    (couleur) => {
+      const corps = { nom: couleur.name, hexa: couleur.hex };
+      void ecrire(() =>
+        state.library.colors.some((c) => c.id === couleur.id)
+          ? envoyer(`/api/gestion/coloris/${couleur.id}/`, "PATCH", corps)
+          : envoyer("/api/gestion/coloris/", "POST", corps),
+      );
+    },
+    [ecrire, state.library.colors],
+  );
 
-  const deleteColor = useCallback<AdminContextValue["deleteColor"]>((id) => {
-    setState((s) => ({
-      ...s,
-      library: { ...s.library, colors: s.library.colors.filter((c) => c.id !== id) },
-    }));
-  }, []);
+  const deleteColor = useCallback<AdminContextValue["deleteColor"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/coloris/${id}/`, "DELETE")),
+    [ecrire],
+  );
 
   const setMaterials = useCallback<AdminContextValue["setMaterials"]>(
-    (materials) => majBibliotheque({ materials }),
-    [majBibliotheque],
+    (matieres) =>
+      setState((courant) => ({ ...courant, library: { ...courant.library, materials: matieres } })),
+    [],
   );
 
-  const addMedia = useCallback<AdminContextValue["addMedia"]>((items) => {
-    setState((s) => {
-      // Deux fois la même image n'apporte rien.
-      const connus = new Set(s.library.media.map((m) => m.src));
-      const nouveaux = items
-        .filter((item) => !connus.has(item.src))
-        .map((item, index) => ({
-          id: `media-${Date.now().toString(36)}-${index}`,
-          src: item.src,
-          name: item.name,
-          addedAt: new Date().toISOString(),
-        }));
-      if (nouveaux.length === 0) return s;
-      return { ...s, library: { ...s.library, media: [...nouveaux, ...s.library.media] } };
-    });
-  }, []);
+  const addMedia = useCallback<AdminContextValue["addMedia"]>(
+    (items) =>
+      void ecrire(async () => {
+        for (const item of items) {
+          await envoyer("/api/gestion/photheque/", "POST", { url: item.src, nom: item.name });
+        }
+      }),
+    [ecrire],
+  );
 
-  const removeMedia = useCallback<AdminContextValue["removeMedia"]>((id) => {
-    setState((s) => ({
-      ...s,
-      library: { ...s.library, media: s.library.media.filter((m) => m.id !== id) },
-    }));
-  }, []);
+  /**
+   * Envoie une image et la range dans la photothèque.
+   *
+   * Renvoie l'entrée créée plutôt que rien : l'appelant en a besoin tout de
+   * suite pour l'attacher à un rayon ou à une fiche, sans attendre la relecture.
+   */
+  const televerserMedia = useCallback<AdminContextValue["televerserMedia"]>(
+    async (fichier, nom) => {
+      const forme = new FormData();
+      forme.append("fichier", fichier);
+      forme.append("nom", nom?.trim() || fichier.name);
 
-  /* --- Vitrine --- */
+      setEnCours(true);
+      setErreur("");
+      try {
+        const brut = await televerser<MediaApi>("/api/gestion/photheque/", forme);
+        await relire();
+        return versMedia(brut);
+      } catch (e) {
+        setErreur(e instanceof Error ? e.message : "L'envoi de l'image a échoué.");
+        return null;
+      } finally {
+        setEnCours(false);
+      }
+    },
+    [relire],
+  );
+
+  const removeMedia = useCallback<AdminContextValue["removeMedia"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/photheque/${id}/`, "DELETE")),
+    [ecrire],
+  );
+
+  /* ---------------------------------------------------------- vitrine */
 
   const updateHero = useCallback<AdminContextValue["updateHero"]>(
-    (hero) => {
-      setState((s) => ({ ...s, hero }));
-      journal("a modifié", "le bandeau d'accueil");
-    },
-    [journal],
+    (hero) => setState((courant) => ({ ...courant, hero })),
+    [],
   );
 
-  const updateSettings = useCallback<AdminContextValue["updateSettings"]>((patch) => {
-    setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
-  }, []);
+  const updateSettings = useCallback<AdminContextValue["updateSettings"]>(
+    (patch) =>
+      void ecrire(() => envoyer("/api/gestion/reglages/", "PATCH", depuisReglages(patch))),
+    [ecrire],
+  );
 
   const resetDemoData = useCallback(() => {
-    const neuf = construireGraine();
-    setState(neuf);
-    try {
-      window.localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(neuf));
-    } catch {
-      /* ignoré */
-    }
-  }, []);
+    // Les données ne vivent plus dans ce navigateur : il n'y a rien à
+    // réinitialiser d'ici. La commande `peupler --vider` s'en charge côté
+    // serveur, sous le contrôle de quelqu'un.
+    void relire();
+  }, [relire]);
 
   const value = useMemo<AdminContextValue>(
     () => ({
       ...state,
       hydrated,
+      enCours,
+      erreur,
       saveProduct,
       createProduct,
       deleteProduct,
@@ -479,16 +621,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       deleteColor,
       setMaterials,
       addMedia,
+      televerserMedia,
       removeMedia,
       updateHero,
       updateSettings,
       resetDemoData,
     }),
     [
-      state, hydrated, saveProduct, createProduct, deleteProduct, duplicateProduct,
-      setProductStatus, setStock, setOrderStatus, saveCategory, deleteCategory,
-      savePromotion, deletePromotion, saveSizes, setSizeGuide, saveColor, deleteColor,
-      setMaterials, addMedia, removeMedia, updateHero, updateSettings, resetDemoData,
+      state, hydrated, enCours, erreur, saveProduct, createProduct, deleteProduct,
+      duplicateProduct, setProductStatus, setStock, setOrderStatus, saveCategory,
+      deleteCategory, savePromotion, deletePromotion, saveSizes, setSizeGuide,
+      saveColor, deleteColor, setMaterials, addMedia, televerserMedia, removeMedia, updateHero,
+      updateSettings, resetDemoData,
     ],
   );
 

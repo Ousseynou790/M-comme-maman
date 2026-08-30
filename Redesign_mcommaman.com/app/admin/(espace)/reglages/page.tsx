@@ -8,7 +8,6 @@ import {
   Button,
   Field,
   Input,
-  Note,
   PageHeader,
   Section,
   Textarea,
@@ -149,7 +148,7 @@ export default function Page() {
         {/* ------------------------------------------------------ démonstration */}
         <Section
           title="Données de démonstration"
-          sub={`Tout le back-office tient dans une seule clé du navigateur (${ADMIN_STORAGE_KEY}).`}
+          sub="Le back-office écrit désormais dans la base. Ce bouton n'efface qu'un reliquat laissé par une version antérieure dans ce navigateur."
         >
           <p className="text-[13px] leading-relaxed text-muted">
             Remettre la démonstration efface les fiches, commandes, rayons et campagnes créés ici et
@@ -255,15 +254,6 @@ export default function Page() {
             </div>
           )}
         </Section>
-      </div>
-
-      <div className="mt-4">
-        <Note>
-          Ces réglages ne redescendent pas encore sur la vitrine : elle lit ses propres constantes
-          (<code>lib/livraison.ts</code>, <code>components/hero.tsx</code>). Sur 3001, le pont
-          existe — la vitrine ouvre la clé du back-office à la main. Ici il reste à poser, ou à
-          attendre la base.
-        </Note>
       </div>
     </>
   );

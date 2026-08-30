@@ -7,7 +7,6 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconCheck,
-  IconInfo,
   IconSearchAdmin,
   IconTrash,
   IconX,
@@ -401,13 +400,19 @@ export function Field({
 export function Input({
   value,
   onChange,
+  className = "",
   ...props
 }: { value: string; onChange: (v: string) => void } & Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "value" | "onChange"
 >) {
   return (
-    <input {...props} value={value} onChange={(e) => onChange(e.target.value)} className={CHAMP} />
+    <input
+      {...props}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${CHAMP} ${className}`}
+    />
   );
 }
 
@@ -641,7 +646,17 @@ export function Modal({
 }
 
 /** Suppression en deux temps : le premier clic demande, le second exécute. */
-export function DeleteButton({ onConfirm, label = "Supprimer" }: { onConfirm: () => void; label?: string }) {
+export function DeleteButton({
+  onConfirm,
+  label = "Supprimer",
+  empeche,
+}: {
+  onConfirm: () => void;
+  label?: string;
+  /** Renseigné quand la suppression est impossible : le bouton l'explique
+      au survol plutôt que de laisser le serveur refuser après coup. */
+  empeche?: string;
+}) {
   const [demande, setDemande] = useState(false);
 
   useEffect(() => {
@@ -649,6 +664,15 @@ export function DeleteButton({ onConfirm, label = "Supprimer" }: { onConfirm: ()
     const t = window.setTimeout(() => setDemande(false), 4000);
     return () => window.clearTimeout(t);
   }, [demande]);
+
+  if (empeche) {
+    return (
+      <Button variant="ghost" size="sm" disabled title={empeche}>
+        <IconTrash />
+        {label}
+      </Button>
+    );
+  }
 
   if (demande) {
     return (
@@ -685,15 +709,6 @@ export function DeleteButton({ onConfirm, label = "Supprimer" }: { onConfirm: ()
 /* ------------------------------------------------------------------ */
 /* Divers                                                              */
 /* ------------------------------------------------------------------ */
-
-export function Note({ children }: { children: ReactNode }) {
-  return (
-    <p className="flex gap-2.5 rounded-2xl bg-gold-soft px-4 py-3.5 text-[12.5px] leading-relaxed text-[#5c4a2a]">
-      <IconInfo className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{children}</span>
-    </p>
-  );
-}
 
 export function EmptyState({
   title,

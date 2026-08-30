@@ -57,15 +57,6 @@ export const slugify = (valeur: string) =>
 /* Rayons                                                              */
 /* ------------------------------------------------------------------ */
 
-/** Rayons transversaux : les chaussures vont avec tout le reste. */
-const LIENS_PAR_DEFAUT: Record<string, string[]> = {
-  chaussures: ["ensembles", "robes-jupes", "bas-jeans", "t-shirts-hauts"],
-  ensembles: ["chaussures"],
-  "robes-jupes": ["chaussures"],
-  "bas-jeans": ["t-shirts-hauts", "chaussures"],
-  "t-shirts-hauts": ["bas-jeans", "chaussures"],
-};
-
 const DESCRIPTIONS: Record<string, string> = {
   ensembles: "Haut et bas assortis, prêts à enfiler le matin",
   "robes-jupes": "Robes de tous les jours et tenues des grands jours",
@@ -84,7 +75,9 @@ export function seedCategories(): AdminCategory[] {
       label,
       description: DESCRIPTIONS[slug] ?? "",
       image: exemple?.image ?? "",
-      links: LIENS_PAR_DEFAUT[slug] ?? [],
+      parentSlugs: [],
+      parentNoms: [],
+      univers: "enfant" as const,
       active: true,
       order: index + 1,
     };
@@ -96,9 +89,8 @@ export function seedCategories(): AdminCategory[] {
 /* ------------------------------------------------------------------ */
 
 const TAILLES_PAR_AGE: Record<string, string[]> = {
-  "0-1": ["3M", "6M", "9M", "12M"],
   "2-10": ["2", "4", "6", "8", "10"],
-  "10-15": ["10", "12", "14"],
+  "11-14": ["12", "14"],
 };
 
 export function seedProducts(): AdminProduct[] {
@@ -115,7 +107,7 @@ export function seedProducts(): AdminProduct[] {
       sizes:
         product.category === "Chaussures"
           ? ["24", "26", "28", "30"]
-          : (TAILLES_PAR_AGE[product.age] ?? []),
+          : (product.age ? (TAILLES_PAR_AGE[product.age] ?? []) : []),
       createdAt: daysAgo(150 - index * 9),
       updatedAt: daysAgo(Math.floor(rand() * 25)),
     };
@@ -169,7 +161,6 @@ export function seedCustomers(): Customer[] {
       phone: `+221 7${Math.floor(rand() * 4) + 3} ${String(Math.floor(rand() * 900) + 100)} ${String(Math.floor(rand() * 90) + 10)} ${String(Math.floor(rand() * 90) + 10)}`,
       city: pick(rand, VILLES),
       createdAt: daysAgo(Math.floor(rand() * 300) + 2),
-      marketingOptIn: rand() > 0.35,
     });
   }
   return liste;

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { IconInstagram } from "@/components/icons";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CartDrawer } from "@/components/cart-drawer";
-import { waLink } from "@/lib/format";
+import { INSTAGRAM, INSTAGRAM_URL, waLink } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Nous écrire",
@@ -85,6 +86,27 @@ export default function Page() {
                 <br />
                 +221 76 208 02 02
               </div>
+            </a>
+
+            {/* Instagram vient après WhatsApp : on écrit pour une question,
+                on suit pour voir arriver les pièces. Deux gestes, deux places. */}
+            <a
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-[20px] border border-line bg-white px-6 py-5.5 transition-colors hover:border-rose"
+            >
+              <div className="flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-[.08em] text-rose">
+                <IconInstagram className="h-4 w-4" />
+                Les arrivages en premier
+              </div>
+              <div className="mt-2 text-[15px] font-semibold leading-relaxed">
+                @{INSTAGRAM}
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+                Les pièces sont photographiées dès leur arrivée, portées par de vrais enfants.
+                Beaucoup partent avant même d&apos;être en ligne.
+              </p>
             </a>
 
             {CARDS.map((c) => (

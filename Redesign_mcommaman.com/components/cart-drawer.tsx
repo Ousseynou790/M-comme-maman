@@ -5,12 +5,12 @@ import { formatXOF, waLink } from "@/lib/format";
 import { useCart } from "./cart-context";
 
 export function CartDrawer() {
-  const { drawerOpen, closeDrawer, items, subtotal, bump, optionLabel } = useCart();
+  const { drawerOpen, closeDrawer, lignes, subtotal, complet, bump, erreur } = useCart();
 
   if (!drawerOpen) return null;
 
   const message =
-    "Bonjour, je souhaite commander : " + items.map((i) => `${i.name} ×${i.qty}`).join(", ");
+    "Bonjour, je souhaite commander : " + lignes.map((l) => `${l.nom} ×${l.quantite}`).join(", ");
 
   return (
     <div onClick={closeDrawer} className="fixed inset-0 z-95 flex justify-end bg-ink/45">
@@ -26,27 +26,38 @@ export function CartDrawer() {
         </div>
 
         <div className="flex flex-1 flex-col gap-4.5 overflow-auto px-6 py-5">
-          {items.length === 0 && (
+          {lignes.length === 0 && (
             <p className="py-16 text-center text-sm text-muted">Votre panier est vide.</p>
           )}
-          {items.map((i) => (
-            <div key={`${i.id}-${i.color}-${i.size}`} className="flex gap-3.5">
+          {lignes.map((l) => (
+            <div key={l.id} className="flex gap-3.5">
               <div
                 className="h-23 w-[74px] shrink-0 rounded-xl bg-stone bg-cover bg-center"
-                style={{ backgroundImage: `url(${i.image})` }}
+                style={{ backgroundImage: `url(${l.image})` }}
               />
               <div className="flex-1">
-                <div className="text-sm font-bold">{i.name}</div>
-                <div className="mt-1 text-[12.5px] text-muted">
-                  {optionLabel({ id: i.id, qty: i.qty, color: i.color, size: i.size })}
-                </div>
+                <Link href={`/p/${l.slug}`} onClick={closeDrawer} className="text-sm font-bold">
+                  {l.nom}
+                </Link>
+                <div className="mt-1 text-[12.5px] text-muted">{l.option}</div>
+
+                {/* Une ligne devenue inservable reste visible et se signale : un
+                    panier qui maigrit tout seul est incompréhensible. */}
+                {!l.disponible && (
+                  <div className="mt-1.5 text-[12px] font-semibold text-rose-deep">
+                    {l.stock_restant > 0
+                      ? `Il n'en reste que ${l.stock_restant}`
+                      : "Épuisé pour le moment"}
+                  </div>
+                )}
+
                 <div className="mt-3 flex items-center justify-between">
                   <span className="flex items-center gap-3.5 rounded-full border-[1.5px] border-[#e5d9de] px-3 py-1 text-[13px] font-semibold">
-                    <button onClick={() => bump(i.id, -1)} aria-label="Retirer un">−</button>
-                    <span className="tabular-nums">{i.qty}</span>
-                    <button onClick={() => bump(i.id, 1)} aria-label="Ajouter un">+</button>
+                    <button onClick={() => bump(l.id, -1)} aria-label="Retirer un">−</button>
+                    <span className="tabular-nums">{l.quantite}</span>
+                    <button onClick={() => bump(l.id, 1)} aria-label="Ajouter un">+</button>
                   </span>
-                  <span className="text-sm font-extrabold">{formatXOF(i.price * i.qty)}</span>
+                  <span className="text-sm font-extrabold">{formatXOF(l.sous_total)}</span>
                 </div>
               </div>
             </div>
@@ -54,11 +65,21 @@ export function CartDrawer() {
         </div>
 
         <div className="border-t border-line px-6 py-5">
+          {erreur && (
+            <p className="mb-3 rounded-2xl bg-rose-soft px-4 py-2.5 text-[12.5px] text-rose-deep">
+              {erreur}
+            </p>
+          )}
           <div className="flex justify-between text-lg font-extrabold">
             <span>Total</span>
             <span className="tabular-nums">{formatXOF(subtotal)}</span>
           </div>
           <p className="mt-1.5 text-[12.5px] text-muted">Livraison offerte à Dakar dès 25 000 F.</p>
+          {!complet && (
+            <p className="mt-2 text-[12.5px] font-semibold text-rose-deep">
+              Un article n&apos;est plus servable : ajustez avant de commander.
+            </p>
+          )}
           <Link
             href="/commande"
             onClick={closeDrawer}

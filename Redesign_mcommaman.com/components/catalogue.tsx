@@ -10,9 +10,8 @@ import { chercherProduits } from "@/lib/search";
 const SORTS = ["Nouveautés", "Prix croissant", "Prix décroissant", "A → Z"] as const;
 
 const AGE_FACETS = [
-  { key: "0-1", label: "0 à 1 an" },
   { key: "2-10", label: "2 à 10 ans" },
-  { key: "10-15", label: "10 à 15 ans" },
+  { key: "11-14", label: "11 à 14 ans" },
 ];
 
 const GENDER_FACETS = [
@@ -20,7 +19,14 @@ const GENDER_FACETS = [
   { key: "garcon", label: "Garçon" },
 ];
 
-export function Catalogue() {
+export function Catalogue({
+  produits = PRODUCTS,
+  rayons = [],
+}: {
+  produits?: Product[];
+  /** Les catégories du serveur, chacune avec ses sous-catégories. */
+  rayons?: { nom: string; enfants: { nom: string }[] }[];
+}) {
   const params = useSearchParams();
 
   const initial = useMemo(() => {
@@ -57,7 +63,7 @@ export function Catalogue() {
   /* Cherchée, la liste arrive déjà classée par pertinence ; les facettes ne
      font ensuite que retrancher, elles ne rebattent pas l'ordre. */
   const base = useMemo(
-    () => (recherche ? chercherProduits(recherche, 100).map((r) => r.product) : PRODUCTS),
+    () => (recherche ? chercherProduits(recherche, 100).map((r) => r.product) : produits),
     [recherche]
   );
 
@@ -120,7 +126,7 @@ export function Catalogue() {
               ? `${list.length} pièce${list.length > 1 ? "s" : ""} ${
                   recherche ? "pour cette recherche" : "correspondent à votre sélection"
                 }.`
-              : `${PRODUCTS.length} pièces, toutes photographiées et décrites. Tout tient sur une seule page.`}
+              : `${produits.length} pièces, toutes photographiées et décrites. Tout tient sur une seule page.`}
           </p>
         </div>
         <button
@@ -133,7 +139,19 @@ export function Catalogue() {
 
       <div className="grid grid-cols-[240px_1fr] gap-11 pb-20 pt-7">
         <aside>
-          {facet("Catégorie", CATEGORIES.map((c) => ({ key: "cat:" + c, label: c })))}
+          {/* Les sous-catégories font les pastilles : cliquer sur « Tissus »
+              est plus parlant que cliquer sur « Coin Maman », qui ne
+              retirerait rien. La parente reste le titre du groupe. */}
+          {rayons.length > 0
+            ? rayons.map((racine) =>
+                racine.enfants.length > 0
+                  ? facet(
+                      racine.nom,
+                      racine.enfants.map((e) => ({ key: "cat:" + e.nom, label: e.nom })),
+                    )
+                  : null,
+              )
+            : facet("Catégorie", CATEGORIES.map((c) => ({ key: "cat:" + c, label: c })))}
           {facet("Âge", AGE_FACETS.map((a) => ({ key: "age:" + a.key, label: a.label })))}
           {facet("Genre", GENDER_FACETS.map((g) => ({ key: "g:" + g.key, label: g.label })))}
 
@@ -201,8 +219,8 @@ export function Catalogue() {
 
           <p className="pt-11 text-center text-[13.5px] text-muted">
             {recherche || filters.length
-              ? `Fin des résultats. Retirez une pastille pour revoir les ${PRODUCTS.length} pièces.`
-              : `Vous avez vu les ${PRODUCTS.length} pièces. Pas de page 2 pour un catalogue de cette taille.`}
+              ? `Fin des résultats. Retirez une pastille pour revoir les ${produits.length} pièces.`
+              : `Vous avez vu les ${produits.length} pièces. Pas de page 2 pour un catalogue de cette taille.`}
           </p>
         </div>
       </div>

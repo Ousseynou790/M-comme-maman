@@ -8,7 +8,6 @@ import {
   Chip,
   Kpi,
   Modal,
-  Note,
   OrderChip,
   PageHeader,
   Pills,
@@ -54,7 +53,10 @@ export default function Page() {
           s.customer.name.toLowerCase().includes(q) ||
           s.customer.city.toLowerCase().includes(q) ||
           s.customer.email.toLowerCase().includes(q)
-      );
+      )
+      /* La dernière inscrite en tête. Le serveur renvoie déjà cet ordre, mais
+         s'y fier le rendrait fragile : un tri en amont suffirait à le perdre. */
+      .sort((a, b) => b.customer.createdAt.localeCompare(a.customer.createdAt));
   }, [stats, filtre, recherche]);
 
   const fiche = stats.find((s) => s.customer.id === ouverte) ?? null;
@@ -65,7 +67,6 @@ export default function Page() {
     : [];
 
   const total = stats.reduce((somme, s) => somme + s.spent, 0);
-  const optIn = customers.filter((c) => c.marketingOptIn).length;
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture du fichier clientes…</p>;
 
@@ -77,7 +78,7 @@ export default function Page() {
         sub="Le segment se déduit des commandes : trois commandes font une fidèle, 120 000 F une VIP, trois mois sans rien une endormie."
       />
 
-      <div className="mb-4 grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
         <Kpi label="Clientes" value={String(customers.length)} />
         <Kpi
           label="Chiffre d'affaires cumulé"
@@ -87,12 +88,6 @@ export default function Page() {
         <Kpi
           label="Panier moyen par cliente"
           value={formatXOF(stats.length ? Math.round(total / stats.length) : 0)}
-        />
-        <Kpi
-          label="Acceptent les messages"
-          value={`${optIn}/${customers.length}`}
-          hint={optIn ? "consentement recueilli" : "personne pour l'instant"}
-          tone={optIn ? "#2e7d52" : "#7a6b72"}
         />
       </div>
 
@@ -150,15 +145,6 @@ export default function Page() {
         ]}
       />
 
-      <div className="mt-4">
-        <Note>
-          Ce fichier vient de la démonstration. Les comptes créés sur la vitrine vivent dans le
-          navigateur de chaque cliente (<code>mcm-comptes-v1</code>) et ne remontent pas ici. Le
-          jour où ils seront en base, la case «&nbsp;accepte les messages&nbsp;» devra être une vraie
-          preuve de consentement, datée.
-        </Note>
-      </div>
-
       {fiche && (
         <Modal open onClose={() => setOuverte(null)} title={fiche.customer.name} wide>
           <div className="grid gap-5 sm:grid-cols-[1fr_1.4fr] sm:items-start">
@@ -171,11 +157,6 @@ export default function Page() {
               <p className="mt-1 text-[13px] text-muted">{fiche.customer.city}</p>
               <p className="mt-3 border-t border-line pt-3 text-[12.5px] text-muted">
                 Cliente depuis le {dateLongue(fiche.customer.createdAt)}
-              </p>
-              <p className="mt-1 text-[12.5px] text-muted">
-                {fiche.customer.marketingOptIn
-                  ? "Accepte de recevoir les nouveautés."
-                  : "Ne souhaite pas être contactée."}
               </p>
               <p className="mt-3 border-t border-line pt-3 text-[13px]">
                 <strong className="text-[17px] font-extrabold tabular-nums">

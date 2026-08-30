@@ -40,11 +40,11 @@ export interface OrderLine {
   slug: string;
   name: string;
   image: string;
-  /** Indices dans `COLORS` et `SIZES` : de quoi remettre la ligne au panier. */
-  color: number;
-  size: number;
-  /** Le même choix en toutes lettres, figé : « Rose poudré · 2 ans ». Si la
-      table des couleurs bouge un jour, la commande garde ce qui a été acheté. */
+  /** La variante achetée. Absente des commandes passées avant le serveur :
+      on repasse alors par le slug pour recommander. */
+  variante?: number;
+  /** Le choix en toutes lettres, figé : « Rose poudré · 2 ans ». Si le coloris
+      disparaît du catalogue, la commande garde ce qui a été acheté. */
   option: string;
   price: number;
   quantity: number;

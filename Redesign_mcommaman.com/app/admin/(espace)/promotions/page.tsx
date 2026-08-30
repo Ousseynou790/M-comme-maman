@@ -15,7 +15,6 @@ import {
   EmptyState,
   Field,
   Input,
-  Note,
   OptionPills,
   PageHeader,
   Pagination,
@@ -354,14 +353,6 @@ export default function Page() {
         onPage={setPage}
         unite="campagnes"
       />
-
-      <div className="mt-4">
-        <Note>
-          La fin d&apos;une campagne n&apos;est jamais saisie : elle se calcule à partir de la date
-          d&apos;effet et de la durée (<code>promotionEndDate</code>). Deux champs qui pourraient se
-          contredire finissent toujours par se contredire.
-        </Note>
-      </div>
 
       <SideDrawer
         open={Boolean(brouillon)}

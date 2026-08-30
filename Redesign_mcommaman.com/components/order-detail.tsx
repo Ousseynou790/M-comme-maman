@@ -26,7 +26,7 @@ export function OrderDetail({ orderRef }: { orderRef: string }) {
   const params = useSearchParams();
   const nouvelle = params.get("nouvelle") === "1";
   const { getOrder, cancelOrder, confirmDelivery, hydrated } = useOrders();
-  const { add } = useCart();
+  const { addBySlug } = useCart();
   const [confirmeAnnulation, setConfirmeAnnulation] = useState(false);
   const [recommandee, setRecommandee] = useState(false);
 
@@ -71,8 +71,10 @@ export function OrderDetail({ orderRef }: { orderRef: string }) {
   const pieces = commande.lines.reduce((somme, l) => somme + l.quantity, 0);
 
   const recommander = () => {
+    // On repasse par la fiche plutôt que par la variante d'origine : celle-ci
+    // peut être épuisée depuis, et le serveur en propose une servable.
     for (const ligne of commande.lines) {
-      for (let n = 0; n < ligne.quantity; n++) add(ligne.productId, ligne.color, ligne.size);
+      for (let n = 0; n < ligne.quantity; n++) addBySlug(ligne.slug);
     }
     setRecommandee(true);
     window.setTimeout(() => setRecommandee(false), 2200);

@@ -17,7 +17,6 @@ import {
   BarChart,
   CARTE,
   Kpi,
-  Note,
   OrderChip,
   PageHeader,
   Pills,
@@ -367,24 +366,20 @@ export default function Page() {
               <p className="text-[13px] text-muted">Rien encore.</p>
             ) : (
               <ul className={`${CARTE} divide-y divide-[#f4edf0] border-0`}>
-                {activity.slice(0, 7).map((a) => (
-                  <li key={a.id} className="py-2.5 text-[12.5px] leading-relaxed first:pt-0">
-                    <strong className="font-bold">{a.author}</strong> {a.action}{" "}
-                    <span className="text-muted">{a.target}</span>
-                    <span className="mt-0.5 block text-[11px] text-muted">{dateCourte(a.at)}</span>
-                  </li>
-                ))}
+                {[...activity]
+                  .sort((a, b) => b.at.localeCompare(a.at))
+                  .slice(0, 7)
+                  .map((a) => (
+                    <li key={a.id} className="py-2.5 text-[12.5px] leading-relaxed first:pt-0">
+                      <strong className="font-bold">{a.author}</strong> {a.action}{" "}
+                      <span className="text-muted">{a.target}</span>
+                      <span className="mt-0.5 block text-[11px] text-muted">{dateCourte(a.at)}</span>
+                    </li>
+                  ))}
               </ul>
             )}
           </Section>
         </div>
-      </div>
-
-      <div className="mt-4">
-        <Note>
-          Les chiffres se lisent depuis une date de référence figée au 15 août 2026, celle de la
-          démonstration : sans elle, la graine vieillirait et cette page finirait vide.
-        </Note>
       </div>
     </>
   );

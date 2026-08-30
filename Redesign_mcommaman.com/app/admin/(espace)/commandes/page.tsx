@@ -12,7 +12,6 @@ import type { Order, OrderStatus } from "@/lib/admin/types";
 import {
   Button,
   Modal,
-  Note,
   OrderChip,
   PageHeader,
   Pills,
@@ -137,15 +136,6 @@ export default function Page() {
           ];
         }}
       />
-
-      <div className="mt-4">
-        <Note>
-          Les commandes affichées ici sont celles de la démonstration. Celles que passent les
-          clientes sur la vitrine vivent dans leur propre navigateur (<code>mcm-commandes-v1</code>)
-          et n&apos;arrivent pas jusqu&apos;au back-office : c&apos;est le serveur qui les
-          réunira.
-        </Note>
-      </div>
 
       <DetailCommande
         commande={commande}

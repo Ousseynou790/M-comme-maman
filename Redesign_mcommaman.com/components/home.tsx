@@ -18,6 +18,7 @@ import {
   IconArrow,
   IconArrowUp,
   IconGmail,
+  IconInstagram,
   IconLeaf,
   IconQuote,
   IconRuler,
@@ -30,8 +31,8 @@ import { QuickView } from "./quick-view";
 import { useReviews } from "./reviews-context";
 import { StarRow } from "./review-form";
 import { Countdown } from "./countdown";
-import { waLink } from "@/lib/format";
-import { PRODUCTS, PROMO_END, type Product } from "@/lib/products";
+import { INSTAGRAM, INSTAGRAM_URL, waLink } from "@/lib/format";
+import { HERO_VIGNETTES, PRODUCTS, PROMO_END, type Product } from "@/lib/products";
 
 const REASSURANCE = [
   { t: "Livraison 24 h", s: "Dakar et banlieue, appel avant passage" },
@@ -72,11 +73,11 @@ const TUILES_UNIVERS = [
     className: "",
   },
   {
-    slug: "bebes",
-    label: "Bébés",
-    caption: "0 à 2 ans",
+    slug: "coin-maman",
+    label: "Coin Maman",
+    caption: "Tissus & voiles",
     image: "/images/univers/Ensembleenfant-193-retouche.png",
-    href: "/boutique?age=0-1",
+    href: "/coin-maman",
     className: "",
   },
   {
@@ -105,7 +106,31 @@ const TABS = [
   { key: "tous", label: "Tous" },
   { key: "fille", label: "Fille" },
   { key: "garcon", label: "Garçon" },
-  { key: "0-1", label: "Bébé" },
+];
+
+/* Les trois visuels du Coin Maman. Ils pointent vers leur sous-catégorie
+   plutôt que vers la page entière : on entre par ce qu'on a vu. */
+const CDN = "https://mcommaman.com/cdn/shop/files/";
+
+const COIN_MAMAN_VIGNETTES = [
+  {
+    src: `${CDN}Ensemble_enfant-121.jpg?width=600`,
+    href: "/coin-maman?cat=Tissus",
+    libelle: "Bazin riche",
+    alt: "Voir les tissus",
+  },
+  {
+    src: `${CDN}Ensembleenfant-153.jpg?width=600`,
+    href: "/coin-maman?cat=Voiles",
+    libelle: "Voiles brodés",
+    alt: "Voir les voiles",
+  },
+  {
+    src: `${CDN}Ensemble_enfant-26.jpg?width=600`,
+    href: "/coin-maman?cat=Tissus",
+    libelle: "Coupons wax",
+    alt: "Voir les tissus",
+  },
 ];
 
 /* Reprise de la section « Pourquoi M comme Maman » de la maquette boty :
@@ -162,6 +187,15 @@ const CONTACT = [
     Icone: IconGmail,
     pastille: "bg-white",
   },
+  {
+    canal: "Instagram",
+    valeur: `@${INSTAGRAM}`,
+    delai: "Les arrivages en premier",
+    href: INSTAGRAM_URL,
+    externe: true,
+    Icone: IconInstagram,
+    pastille: "bg-ink text-white",
+  },
 ];
 
 /* Date de fin lue dans `PROMO_END`, sans passer par `Date` : le serveur et le
@@ -217,7 +251,7 @@ export function Home() {
   }, [tab]);
 
   const shown = PRODUCTS.filter((p) =>
-    tab === "tous" ? true : tab === "0-1" ? p.age === "0-1" : p.gender === tab || p.gender === "mixte"
+    tab === "tous" ? true : p.gender === tab || p.gender === "mixte"
   );
 
   return (
@@ -482,6 +516,72 @@ export function Home() {
         </Reveal>
       </section>
 
+      {/* ====================================================== Coin Maman */}
+      {/* La boutique ne vend pas que des vêtements d'enfant : les mamans qui
+          viennent habiller les petits repartent souvent avec de quoi se coudre
+          quelque chose. Cette section leur ouvre une porte à elles. */}
+      <section className={`${SHELL} pt-16 md:pt-20`}>
+        <Reveal className="overflow-hidden rounded-[28px] border border-line bg-mist">
+          <div className="grid gap-8 p-7 md:grid-cols-[1.1fr_1fr] md:items-center md:p-10">
+            <div>
+              <span className={EYEBROW}>Pour vous aussi</span>
+              <h2 className={`${H2} mt-2.5 text-balance`}>
+                Le Coin Maman : tissus et voiles
+              </h2>
+              <p className="mt-3 max-w-[52ch] text-[14.5px] leading-relaxed text-muted">
+                Du bazin riche au coupon de wax, des voiles brodés et des foulards en soie.
+                Choisis avec le même soin que les pièces d&apos;enfant, et vendus au coupon
+                ou à la pièce.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Magnetic>
+                  <Link
+                    href="/coin-maman"
+                    className="shine group flex items-center gap-2.5 rounded-full bg-ink px-6 py-3.5 text-[13.5px] font-bold text-white"
+                  >
+                    Découvrir le Coin Maman
+                    <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
+                  </Link>
+                </Magnetic>
+                <Link
+                  href="/coin-maman?cat=Tissus"
+                  className="flex items-center gap-2.5 rounded-full border-[1.5px] border-[#e5d9de] bg-white px-6 py-3.5 text-[13.5px] font-bold transition-colors duration-300 hover:border-rose hover:text-rose"
+                >
+                  Voir les tissus
+                </Link>
+              </div>
+
+              <p className="mt-4 text-[12.5px] text-muted">
+                Un métrage précis, une teinte à vérifier : demandez, on mesure avant d&apos;envoyer.
+              </p>
+            </div>
+
+            {/* Trois visuels en quinconce : un aperçu, pas un catalogue. */}
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
+              {COIN_MAMAN_VIGNETTES.map((v, i) => (
+                <Link
+                  key={v.src}
+                  href={v.href}
+                  aria-label={v.alt}
+                  className={`group relative aspect-square overflow-hidden rounded-[18px] bg-stone ${
+                    i === 1 ? "translate-y-4" : ""
+                  }`}
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-[900ms] ease-soft group-hover:scale-105"
+                    style={{ backgroundImage: `url(${v.src})` }}
+                  />
+                  <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-ink/70 to-transparent px-3 pb-2.5 pt-8 text-[11.5px] font-bold text-white opacity-0 transition-opacity duration-300 ease-soft group-hover:opacity-100">
+                    {v.libelle}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
       {/* ============================================================= avis */}
       <section className={`${SHELL} pt-16 md:pt-20`}>
         <Reveal className="mb-7 text-center">
@@ -560,7 +660,7 @@ export function Home() {
         <h2 className={`${H2} mx-auto mt-2.5 text-balance`}>Nous contacter</h2>
         {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
             où la cliente a déjà l'habitude d'écrire. */}
-        <div className="mx-auto mt-9 grid max-w-[720px] gap-3.5 sm:grid-cols-2">
+        <div className="mx-auto mt-9 grid max-w-[1020px] gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {CONTACT.map((c) => (
             <a
               key={c.canal}
@@ -584,7 +684,13 @@ export function Home() {
           ))}
         </div>
 
-        <p className="mt-6 text-[13px] text-muted">Lundi au samedi, 9 h – 19 h · Dakar, Sénégal</p>
+        <p className="mt-6 text-[13px] text-muted">
+          Lundi au samedi, 9 h – 19 h · Dakar, Sénégal
+        </p>
+        <p className="mx-auto mt-1.5 max-w-[46ch] text-[13px] text-muted">
+          Les pièces sont photographiées dès leur arrivée sur Instagram : beaucoup partent avant
+          même d&apos;être en ligne.
+        </p>
       </Reveal>
 
       <QuickView product={quick} onClose={() => setQuick(null)} />

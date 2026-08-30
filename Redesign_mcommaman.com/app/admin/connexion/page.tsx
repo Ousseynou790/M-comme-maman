@@ -3,43 +3,54 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ADMIN_SESSION_KEY } from "@/components/admin/shell";
 import { IconLock, IconMail } from "@/components/icons";
+import { ErreurApi, envoyer as appeler } from "@/lib/api";
 
-/* Identifiants de démonstration, écrits en clair et affichés sous le
-   formulaire : il n'y a rien à protéger tant qu'aucune donnée réelle ne passe
-   par ici. Voir la note en bas de `components/admin/shell.tsx`. */
-const EMAIL_DEMO = "ousseynou@mcommemaman.sn";
-const MOT_DE_PASSE_DEMO = "mcm2026";
+/* La connexion passe par la même route que celle des clientes : c'est le rôle
+   du compte qui ouvre le back-office, pas une adresse particulière. Il n'y a
+   plus d'identifiants en clair dans ce fichier. */
 
 export default function Page() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [erreur, setErreur] = useState("");
+  const [envoi, setEnvoi] = useState(false);
 
   /* Déjà entrée : on ne redemande pas. */
   useEffect(() => {
-    try {
-      if (window.localStorage.getItem(ADMIN_SESSION_KEY) === "1") router.replace("/admin");
-    } catch {
-      /* stockage indisponible : le formulaire reste affiché */
-    }
+    appeler<{ utilisateur: { est_equipe: boolean } | null }>("/api/compte/moi/")
+      .then((r) => {
+        if (r.utilisateur?.est_equipe) router.replace("/admin");
+      })
+      .catch(() => undefined);
   }, [router]);
 
-  const envoyer = (e: React.FormEvent) => {
+  const envoyer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim().toLowerCase() !== EMAIL_DEMO || motDePasse !== MOT_DE_PASSE_DEMO) {
-      setErreur("Identifiant ou mot de passe incorrect.");
-      return;
-    }
+    setErreur("");
+    setEnvoi(true);
     try {
-      window.localStorage.setItem(ADMIN_SESSION_KEY, "1");
-    } catch {
-      setErreur("Le navigateur refuse d'enregistrer la session.");
-      return;
+      const compte = await appeler<{ est_equipe: boolean }>(
+        "/api/compte/connexion/",
+        "POST",
+        { email: email.trim(), mot_de_passe: motDePasse },
+      );
+      // Un compte cliente peut se connecter ici sans que la porte s'ouvre :
+      // on referme aussitôt plutôt que de laisser une session ambiguë.
+      if (!compte.est_equipe) {
+        await appeler("/api/compte/deconnexion/", "POST").catch(() => undefined);
+        setErreur("Ce compte n'a pas accès au back-office.");
+        return;
+      }
+      router.replace("/admin");
+    } catch (e) {
+      setErreur(
+        e instanceof ErreurApi ? e.message : "Le serveur ne répond pas. Réessayez.",
+      );
+    } finally {
+      setEnvoi(false);
     }
-    router.replace("/admin");
   };
 
   const champ =
@@ -108,15 +119,19 @@ export default function Page() {
 
           <button
             type="submit"
-            className="mt-6 w-full rounded-full bg-rose py-3.5 text-[14px] font-bold text-white transition-transform duration-400 ease-soft hover:-translate-y-0.5"
+            disabled={envoi}
+            className="mt-6 w-full rounded-full bg-rose py-3.5 text-[14px] font-bold text-white transition-transform duration-400 ease-soft hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
           >
-            Entrer
+            {envoi ? "Vérification…" : "Entrer"}
           </button>
 
-          <p className="mt-5 rounded-2xl bg-gold-soft px-4 py-3.5 text-[12px] leading-relaxed text-[#5c4a2a]">
-            Démonstration : <strong>{EMAIL_DEMO}</strong>, mot de passe{" "}
-            <code className="rounded bg-white/70 px-1.5 py-0.5 font-bold">{MOT_DE_PASSE_DEMO}</code>.
-            Ce n&apos;est pas une authentification — rien n&apos;est vérifié côté serveur.
+          <p className="mt-5 text-center text-[12.5px]">
+            <Link
+              href="/compte/mot-de-passe-oublie"
+              className="font-semibold text-rose underline underline-offset-4"
+            >
+              Mot de passe oublié ?
+            </Link>
           </p>
         </form>
 

@@ -121,10 +121,25 @@ n'apparaissent qu'au `blur` ou à la tentative de passage. Le paiement à la liv
 hors de Dakar. La remise n'est plus appliquée d'office : il faut saisir le code (`CODES` dans
 `lib/livraison.ts`).
 
-Le panier persiste lui aussi (`mcm-panier-v1`) : il partait d’un panier de démonstration
-remis à zéro à chaque rechargement, ce qui donnait l’impression qu’une commande validée
-n’avait rien enregistré. Le panier de démonstration ne sert plus que tant que ce navigateur
-n’a rien mis dedans.
+### Panier
+
+**`components/cart-context.tsx`** parle au serveur. Ce qu'on met dans le panier est une
+**variante** — un produit dans une taille et un coloris — et non un produit : deux tailles du
+même article n'ont ni le même stock ni la même disponibilité, et c'est la variante que la
+commande achètera. La fiche (`components/product-detail.tsx`) et l'aperçu rapide n'offrent donc
+plus les tailles de référence mais celles que le serveur déclare, et une taille absente du
+coloris choisi se barre au lieu de se proposer.
+
+Deux régimes, comme les favoris. Hors session le panier reste dans le navigateur
+(`mcm-panier-v2` — nouvelle clé : l'ancienne gardait des indices de couleur et de taille qui ne
+veulent plus rien dire). À la connexion il remonte par `POST /api/compte/panier/fusionner/`,
+qui garde **la plus grande des deux quantités et non leur somme** : se reconnecter sur le même
+appareil ne doit pas doubler le panier.
+
+C'est le serveur qui arbitre le stock — `add`, `setQuantity` et `remove` adoptent sa réponse
+plutôt que de la deviner. Une ligne devenue inservable (rupture, fiche dépubliée) **reste
+visible et se signale** au lieu de disparaître, et `complet` ferme la caisse tant qu'elle est
+là : un panier qui maigrit tout seul est incompréhensible.
 
 **Le statut ne bouge pas tout seul.** Rien ne le fait avancer côté client — c'est le
 back-office qui le pilotera. En ligne, il faudra aussi : commande écrite en base, référence

@@ -25,7 +25,7 @@ export function ProductCard({
   delay?: number;
 }) {
   const ref = useSpotlight<HTMLDivElement>();
-  const { add } = useCart();
+  const { addBySlug } = useCart();
 
   const discount = product.compareAt
     ? Math.round((1 - product.price / product.compareAt) * 100)
@@ -76,7 +76,7 @@ export function ProductCard({
 
         {!product.outOfStock && (
           <button
-            onClick={() => add(product.id)}
+            onClick={() => addBySlug(product.slug)}
             aria-label={`Ajouter ${product.name} au panier`}
             className={`${ACTION} bottom-3 left-3`}
           >

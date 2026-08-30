@@ -3,25 +3,98 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatXOF, waLink } from "@/lib/format";
-import { COLORS, SIZES, PRODUCTS, type Product } from "@/lib/products";
+import type { ProduitApi } from "@/lib/api";
+import type { Product } from "@/lib/products";
 import { ProductCard } from "./product-card";
 import { useCart } from "./cart-context";
 import { useReviews } from "./reviews-context";
 import { FavoriteButton } from "./favorite-button";
 import { ReviewForm, ReviewList, StarRow } from "./review-form";
 
-export function ProductDetail({ product }: { product: Product }) {
-  const { add } = useCart();
+/**
+ * La fiche produit.
+ *
+ * Les coloris, les tailles et le stock viennent du serveur, pas des tableaux de
+ * référence : ce qu'on ajoute au panier est une **variante** précise, celle que
+ * la commande achètera. Une taille absente du coloris choisi ne se propose pas.
+ */
+export function ProductDetail({
+  product,
+  fiche,
+  similaires,
+}: {
+  product: Product;
+  fiche: ProduitApi;
+  similaires: Product[];
+}) {
+  const { add, erreur } = useCart();
   const { productReviews, aggregate, hydrated } = useReviews();
-  const [color, setColor] = useState(0);
-  const [size, setSize] = useState(2);
+
+  const coloris = fiche.coloris ?? [];
+  const tailles = fiche.tailles ?? [];
+  const variantes = fiche.variantes ?? [];
+
+  /** La variante servable pour un couple coloris × taille, s'il en existe une. */
+  const servable = (nomColoris: string, valeurTaille: string) =>
+    variantes.find(
+      (v) =>
+        v.coloris_nom === nomColoris &&
+        v.taille_valeur === valeurTaille &&
+        v.disponible &&
+        v.stock > 0,
+    );
+
+  const premiere = variantes.find((v) => v.disponible && v.stock > 0) ?? variantes[0];
+  const [nomColoris, setNomColoris] = useState(premiere?.coloris_nom ?? coloris[0]?.nom ?? "");
+  const [valeurTaille, setValeurTaille] = useState(
+    premiere?.taille_valeur ?? tailles[0]?.valeur ?? "",
+  );
   const [openBlock, setOpenBlock] = useState(0);
+  const [envoi, setEnvoi] = useState(false);
+
+  const variante =
+    variantes.find(
+      (v) => v.coloris_nom === nomColoris && v.taille_valeur === valeurTaille,
+    ) ?? null;
+  const enStock = Boolean(variante && variante.disponible && variante.stock > 0);
+
+  /* Changer de coloris ne doit pas laisser une taille qu'il ne propose pas :
+     on glisse sur la première servable plutôt que d'afficher un bouton mort. */
+  const choisirColoris = (nom: string) => {
+    setNomColoris(nom);
+    if (!servable(nom, valeurTaille)) {
+      const repli = variantes.find((v) => v.coloris_nom === nom && v.disponible && v.stock > 0);
+      if (repli) setValeurTaille(repli.taille_valeur);
+    }
+  };
+
+  const ajouter = async () => {
+    if (!variante) return;
+    setEnvoi(true);
+    await add({
+      variante: variante.id,
+      produit: fiche.id,
+      slug: fiche.slug,
+      nom: fiche.nom,
+      option: `${variante.coloris_nom} · ${variante.taille_valeur}`,
+      image: fiche.image,
+      prix_unitaire: fiche.prix,
+      stock_restant: variante.stock,
+    });
+    setEnvoi(false);
+  };
 
   const blocks = [
     { t: "Description", c: product.description },
     {
       t: "Composition et entretien",
-      c: "95 % coton, 5 % élasthanne.\nLavage machine à 30°, séchage à plat.\nRepassage doux sur l'envers.",
+      c: [
+        fiche.matiere,
+        "Lavage machine à 30°, séchage à plat.",
+        "Repassage doux sur l'envers.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
     {
       t: "Livraison et retours",
@@ -29,18 +102,24 @@ export function ProductDetail({ product }: { product: Product }) {
     },
   ];
 
-  const gallery = [
-    { image: product.image, label: "" },
-    { image: null, label: "vue dos" },
-    { image: null, label: "détail tissu" },
-    { image: null, label: "porté" },
-  ];
+  /* Les vraies photos quand la fiche en porte plusieurs ; sinon les repères de
+     la maquette, en attendant la séance photo. */
+  const photos = fiche.photos?.length ? fiche.photos : [product.image];
+  const gallery =
+    photos.length > 1
+      ? photos.slice(0, 4).map((image) => ({ image, label: "" }))
+      : [
+          { image: product.image, label: "" },
+          { image: null, label: "vue dos" },
+          { image: null, label: "détail tissu" },
+          { image: null, label: "porté" },
+        ];
+
+  const [principale, setPrincipale] = useState(0);
 
   const discount = product.compareAt
     ? `−${Math.round((1 - product.price / product.compareAt) * 100)} %`
     : null;
-
-  const recos = PRODUCTS.filter((p) => p.id !== product.id).slice(0, 4);
 
   /* La note vient des avis déposés, plus d’un chiffre écrit dans la page :
      tant que personne n’a écrit, l’article l’annonce au lieu d’inventer. */
@@ -57,20 +136,23 @@ export function ProductDetail({ product }: { product: Product }) {
         <div>
           <div
             className="aspect-4/5 rounded-3xl bg-stone bg-cover bg-center"
-            style={{ backgroundImage: `url(${product.image})` }}
+            style={{ backgroundImage: `url(${gallery[principale]?.image ?? product.image})` }}
           />
           <div className="mt-3 grid grid-cols-4 gap-3">
             {gallery.map((g, i) => (
-              <div
+              <button
                 key={i}
+                type="button"
+                onClick={() => g.image && setPrincipale(i)}
+                aria-label={g.image ? `Voir la photo ${i + 1}` : g.label}
                 className="flex aspect-square items-end rounded-2xl bg-stone bg-cover bg-center p-2.5"
                 style={{
                   backgroundImage: g.image ? `url(${g.image})` : undefined,
-                  boxShadow: i === 0 ? "0 0 0 2px #241a20" : undefined,
+                  boxShadow: i === principale ? "0 0 0 2px #241a20" : undefined,
                 }}
               >
                 <span className="text-[10px] font-semibold leading-tight text-[#a2939a]">{g.label}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -78,7 +160,7 @@ export function ProductDetail({ product }: { product: Product }) {
         <div className="pt-1.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-[.1em] text-rose">{product.category}</span>
-            <span className="text-xs text-[#9c8d93]">réf. {product.sku}</span>
+            {variante && <span className="text-xs text-[#9c8d93]">réf. {variante.sku}</span>}
           </div>
 
           <h1 className="mt-3.5 text-[40px] font-extrabold leading-[1.08] tracking-[-.03em]">
@@ -115,62 +197,87 @@ export function ProductDetail({ product }: { product: Product }) {
             Taxes incluses. Livraison calculée à l&apos;étape suivante.
           </p>
 
-          <div className="mt-7">
-            <div className="mb-3 flex items-baseline justify-between">
-              <span className="text-[13px] font-bold">Couleur</span>
-              <span className="text-[13px] text-muted">{COLORS[color].name}</span>
+          {coloris.length > 0 && (
+            <div className="mt-7">
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className="text-[13px] font-bold">Couleur</span>
+                <span className="text-[13px] text-muted">{nomColoris}</span>
+              </div>
+              <div className="flex gap-2.5">
+                {coloris.map((c) => (
+                  <button
+                    key={c.nom}
+                    onClick={() => choisirColoris(c.nom)}
+                    aria-label={c.nom}
+                    aria-pressed={nomColoris === c.nom}
+                    className="h-9 w-9 rounded-full transition-transform hover:scale-110"
+                    style={{
+                      background: c.hexa,
+                      boxShadow: `0 0 0 1px #e5d9de, 0 0 0 ${nomColoris === c.nom ? 2 : 0}px #241a20`,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="flex gap-2.5">
-              {COLORS.map((c, i) => (
-                <button
-                  key={c.name}
-                  onClick={() => setColor(i)}
-                  aria-label={c.name}
-                  className="h-9 w-9 rounded-full transition-transform hover:scale-110"
-                  style={{
-                    background: c.hex,
-                    boxShadow: `0 0 0 1px #e5d9de, 0 0 0 ${color === i ? 2 : 0}px #241a20`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+          )}
 
-          <div className="mt-6">
-            <div className="mb-3 flex items-baseline justify-between">
-              <span className="text-[13px] font-bold">Taille</span>
-              <span className="text-[13px] font-semibold text-rose">Guide des tailles</span>
+          {tailles.length > 0 && (
+            <div className="mt-6">
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className="text-[13px] font-bold">Taille</span>
+                <span className="text-[13px] font-semibold text-rose">Guide des tailles</span>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {tailles.map((t) => {
+                  const dispo = Boolean(servable(nomColoris, t.valeur));
+                  return (
+                    <button
+                      key={t.valeur}
+                      onClick={() => setValeurTaille(t.valeur)}
+                      disabled={!dispo}
+                      title={dispo ? t.repere : "Épuisée dans ce coloris"}
+                      aria-pressed={valeurTaille === t.valeur}
+                      className={`rounded-xl border-[1.5px] px-4.5 py-2.5 text-[13.5px] font-semibold transition-colors ${
+                        valeurTaille === t.valeur
+                          ? "border-ink bg-ink text-white"
+                          : "border-[#e5d9de] bg-white"
+                      } ${dispo ? "" : "cursor-not-allowed text-[#c3b6bb] line-through"}`}
+                    >
+                      {t.valeur}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2.5">
-              {SIZES.map((s, i) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(i)}
-                  className={`rounded-xl border-[1.5px] px-4.5 py-2.5 text-[13.5px] font-semibold transition-colors ${
-                    size === i ? "border-ink bg-ink text-white" : "border-[#e5d9de] bg-white"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
-          <div className="mt-5.5 flex items-center gap-2.5 text-[13.5px] font-semibold text-[#2e7d52]">
-            <span className="h-2 w-2 rounded-full bg-[#2e7d52]" />
-            {product.outOfStock ? "Réassort attendu sous 10 jours" : "En stock — expédié aujourd'hui"}
+          <div
+            className={`mt-5.5 flex items-center gap-2.5 text-[13.5px] font-semibold ${
+              enStock ? "text-[#2e7d52]" : "text-muted"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${enStock ? "bg-[#2e7d52]" : "bg-[#c3b6bb]"}`}
+            />
+            {enStock
+              ? variante && variante.stock <= 3
+                ? `Plus que ${variante.stock} en stock`
+                : "En stock — expédié aujourd'hui"
+              : "Réassort attendu sous 10 jours"}
           </div>
 
           <div className="mt-5 flex gap-3">
             <button
-              onClick={() => add(product.id, color, size)}
-              disabled={product.outOfStock}
+              onClick={ajouter}
+              disabled={!enStock || envoi}
               className="flex-1 rounded-full bg-rose py-4.5 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(224,65,127,.65)] transition-all hover:-translate-y-[3px] active:scale-97 disabled:opacity-50"
             >
-              {product.outOfStock ? "Me prévenir du réassort" : "Ajouter au panier"}
+              {enStock ? (envoi ? "Ajout…" : "Ajouter au panier") : "Me prévenir du réassort"}
             </button>
             <a
-              href={waLink(`Bonjour, je suis intéressée par : ${product.name} (${product.sku})`)}
+              href={waLink(
+                `Bonjour, je suis intéressée par : ${product.name}${variante ? ` (${variante.sku})` : ""}`,
+              )}
               target="_blank"
               rel="noreferrer"
               className="rounded-full border-[1.5px] border-[#e5d9de] bg-white px-6 py-4.5 text-[15px] font-bold"
@@ -185,6 +292,13 @@ export function ProductDetail({ product }: { product: Product }) {
               className="shrink-0"
             />
           </div>
+
+          {/* Le refus vient du serveur, qui seul connaît le stock à l'instant du clic. */}
+          {erreur && (
+            <p className="mt-3 rounded-2xl bg-rose-soft px-4 py-3 text-[13px] text-rose-deep">
+              {erreur}
+            </p>
+          )}
 
           <div className="mt-5 flex gap-5 text-[12.5px] text-muted">
             <span>Livraison Dakar 24 h</span>
@@ -211,14 +325,16 @@ export function ProductDetail({ product }: { product: Product }) {
         </div>
       </div>
 
-      <div className="pt-17">
-        <h2 className="mb-5 text-[32px] font-extrabold tracking-[-.03em]">Dans le même esprit</h2>
-        <div className="grid grid-cols-4 gap-5">
-          {recos.map((p, i) => (
-            <ProductCard key={p.id} product={p} delay={i * 60} />
-          ))}
+      {similaires.length > 0 && (
+        <div className="pt-17">
+          <h2 className="mb-5 text-[32px] font-extrabold tracking-[-.03em]">Dans le même esprit</h2>
+          <div className="grid grid-cols-4 gap-5">
+            {similaires.map((p, i) => (
+              <ProductCard key={p.id} product={p} delay={i * 60} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Les avis ferment la fiche, sous les recommandations : c’est là que la
           page d’avis renvoie les clientes. */}
