@@ -2,39 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Ce dossier
+## Ce dépôt
 
-`Projet/` n'est pas un dépôt ni un monorepo : il contient **deux applications Next.js indépendantes**, sans versionnement git, sans workspace partagé. Chacune a son `package.json`, ses `node_modules`, sa version de Next. Toujours travailler depuis le dossier de l'application concernée.
+Un seul dépôt, trois dossiers. `back` et `front` forment la boutique ; `boty-e-commerce-template` est la maquette dont elle s'inspire, gardée pour référence.
 
 | Dossier | Ce que c'est | Stack |
 |---|---|---|
-| `boty-e-commerce-template/` | Boutique complète **M comme Maman** : vitrine + back-office d'administration. Prototype riche, tout en mémoire navigateur. | Next 16, React 19, Tailwind 4, shadcn/ui, Radix, Recharts |
-| `Redesign_mcommaman.com/react/` | Refonte de la vitrine `mcommaman.com` (site Shopify actuel). Zéro dépendance hors Next/React. | Next 15.4, React 19, Tailwind 4, aucune lib UI ni d'animation |
+| `back/` | Le serveur : API de la boutique — catalogue, comptes, panier, ventes, réglages. | Django 5.2, DRF, PostgreSQL 17, Argon2 |
+| `front/` | La vitrine `mcommaman.com` et son back-office. Zéro dépendance hors Next/React. | Next 15.4, React 19, Tailwind 4, aucune lib UI ni d'animation |
+| `boty-e-commerce-template/` | Maquette de référence, tout en mémoire navigateur. On y lit des idées, on n'y corrige rien. | Next 16, React 19, shadcn/ui, Radix, Recharts |
 
-Les deux visent le même commerçant (vêtements enfants, Dakar) mais **ne partagent aucun code**. Une correction dans l'un ne se propage pas à l'autre.
+`front` appelle `back` par HTTP, et rien d'autre ne les relie : le passage entre les deux vocabulaires tient dans `front/lib/api.ts` et `front/lib/admin/passage.ts`. Aucune adresse de serveur n'est écrite ailleurs.
 
 **Toute la base est en français** — copie d'interface, commentaires, et une partie des identifiants et des types métier (`migrer`, `chercherProduits`, statuts `publie` / `en_attente` / `expediee`). Écrire le nouveau code dans la même langue et le même registre que le fichier modifié.
 
 ## Commandes
 
-Les deux applications écoutent le **port 3000** par défaut : pour les lancer ensemble, passer `-- -p 3001` à l'une d'elles.
+Le serveur écoute le **8000**, la vitrine le **3000**. Il faut les deux : sans le serveur, la boutique s'affiche vide.
 
 ```bash
-# boty-e-commerce-template/
-npm run dev            # http://localhost:3000
-npm run build
-npm start
-npx tsc --noEmit       # le seul contrôle de types réel — voir ci-dessous
+# back/
+docker compose up -d                         # PostgreSQL
+.venv\Scripts\python.exe manage.py migrate
+.venv\Scripts\python.exe manage.py peupler   # données de démonstration
+.venv\Scripts\python.exe manage.py runserver
+.venv\Scripts\python.exe manage.py test      # 121 tests, le vrai filet
 
-# Redesign_mcommaman.com/react/
+# front/
 npm install            # déclenche postinstall → fix-routes (obligatoire, voir ci-dessous)
 npm run dev
 npm run build
-npm run fix-routes     # à relancer après extraction d'une nouvelle archive de maquette
-npx tsc --noEmit
+npx tsc --noEmit       # le seul contrôle de types réel — voir ci-dessous
 ```
 
-- **Aucun test** dans les deux projets : pas de runner, pas de fichier de test, pas de config. Vérifier une modification veut dire lancer `npm run dev` et regarder la page.
+- **Le back a des tests, le front n'en a pas.** Côté serveur, `manage.py test` décrit les règles métier et doit rester vert. Côté vitrine, vérifier une modification veut dire lancer `npm run dev` et regarder la page.
+- Les identifiants de démonstration après peuplement : `gerante@mcommaman.com` / `motdepasse123`.
 - **`npm run lint` (boty) échoue** : le script est `eslint .` mais ESLint n'est ni installé ni configuré. Ne pas s'appuyer dessus ; utiliser `npx tsc --noEmit`.
 - **`next.config.mjs` de boty active `typescript.ignoreBuildErrors`** : `npm run build` passe même avec des erreurs de types. Lancer `npx tsc --noEmit` explicitement avant de considérer une modification comme terminée.
 - Boty a `package-lock.json` **et** `pnpm-lock.yaml` ; le `.claude/launch.json` de chaque projet utilise npm — s'y tenir.
@@ -44,7 +46,7 @@ npx tsc --noEmit
 
 La maquette est livrée en export sans crochets dans les noms de dossier : `app/p/-slug-` au lieu de `app/p/[slug]`. `scripts/fix-routes.mjs` renomme récursivement `-slug-` → `[slug]` et tourne en `postinstall`. Si une route dynamique renvoie 404 après avoir récupéré une nouvelle copie du dossier, c'est ça — lancer `npm run fix-routes`.
 
-## Architecture — boty-e-commerce-template
+## Architecture — boty-e-commerce-template (référence)
 
 ### Il n'y a pas de serveur
 
@@ -90,7 +92,7 @@ Les constantes commerciales vivent dans `lib/`, une source par sujet : `shipping
 
 `docs/uml/` contient les cas d'utilisation en `.puml` avec leurs rendus `.png`/`.svg` commités — regénérer les deux si le diagramme change.
 
-## Architecture — Redesign_mcommaman.com/react
+## Architecture — front
 
 `README.md` du projet est détaillé et à jour : table des routes, inventaire des animations, contraintes photo, reste à faire avant mise en ligne. **Le lire avant de toucher à ce projet.** Points structurants :
 

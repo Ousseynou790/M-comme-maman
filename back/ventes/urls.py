@@ -1,0 +1,30 @@
+"""Routes des commandes."""
+
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from .views import (
+    AvisGestionViewSet,
+    AvisViewSet,
+    CampagneViewSet,
+    CommandeGestionViewSet,
+    CommandeViewSet,
+    DevisView,
+    MesCommandesView,
+)
+
+public = DefaultRouter()
+public.register("commandes", CommandeViewSet, basename="commande")
+public.register("avis", AvisViewSet, basename="avis")
+
+gestion = DefaultRouter()
+gestion.register("commandes", CommandeGestionViewSet, basename="commande-gestion")
+gestion.register("campagnes", CampagneViewSet, basename="campagne")
+gestion.register("avis", AvisGestionViewSet, basename="avis-gestion")
+
+urlpatterns = [
+    path("devis/", DevisView.as_view(), name="devis"),
+    path("mes-commandes/", MesCommandesView.as_view(), name="mes-commandes"),
+    path("", include(public.urls)),
+    path("gestion/", include(gestion.urls)),
+]

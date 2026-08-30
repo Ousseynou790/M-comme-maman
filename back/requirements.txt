@@ -1,0 +1,16 @@
+# Socle
+Django==5.2.6
+psycopg[binary]==3.3.4
+
+# Hachage des mots de passe : le hacheur Argon2 de Django a besoin de ce paquet.
+argon2-cffi==25.1.0
+
+# API consommée par la vitrine et le back-office Next
+djangorestframework==3.16.1
+django-cors-headers==4.7.0
+
+# Configuration par variables d'environnement, jamais en dur dans le dépôt
+django-environ==0.12.0
+
+# Validation des images envoyées dans la photothèque (ImageField).
+Pillow==12.3.0
