@@ -211,20 +211,6 @@ class Produit(models.Model):
         PUBLIE = "publie", "Publié"
         ARCHIVE = "archive", "Archivé"
 
-    class Genre(models.TextChoices):
-        FILLE = "fille", "Fille"
-        GARCON = "garcon", "Garçon"
-        MIXTE = "mixte", "Mixte"
-
-    class Age(models.TextChoices):
-        """
-        La boutique habille de 2 à 14 ans. En dessous et au-dessus, elle ne
-        promet rien : mieux vaut ne pas vendre que décevoir sur la taille.
-        """
-
-        ENFANT = "2-10", "2 à 10 ans"
-        GRAND = "11-14", "11 à 14 ans"
-
     nom = models.CharField("nom commercial", max_length=160)
     slug = models.SlugField(max_length=180, unique=True, help_text="Adresse en boutique : /p/<slug>")
     sku = models.CharField("référence interne", max_length=32, unique=True)
@@ -233,15 +219,14 @@ class Produit(models.Model):
     prix_barre = models.PositiveIntegerField("prix barré", null=True, blank=True)
 
     description = models.TextField(blank=True)
-    matiere = models.CharField(max_length=200, blank=True)
+    matieres = models.ManyToManyField(
+        Matiere,
+        blank=True,
+        related_name="produits",
+        help_text="Une composition peut réunir plusieurs matières.",
+    )
 
     rayon = models.ForeignKey(Rayon, on_delete=models.PROTECT, related_name="produits")
-    univers = models.CharField(max_length=8, choices=Univers.choices, default=Univers.ENFANT)
-    # Vides pour le Coin Maman : un coupon de tissu n'a ni âge ni genre.
-    genre = models.CharField(max_length=8, choices=Genre.choices, default=Genre.MIXTE, blank=True)
-    age = models.CharField(
-        "tranche d'âge", max_length=6, choices=Age.choices, default=Age.ENFANT, blank=True
-    )
 
     statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.BROUILLON)
 
@@ -254,8 +239,6 @@ class Produit(models.Model):
         ordering = ["-cree_le"]
         indexes = [
             models.Index(fields=["statut", "rayon"]),
-            models.Index(fields=["univers", "statut"]),
-            models.Index(fields=["genre", "age"]),
         ]
         constraints = [
             # Un prix barré doit être plus élevé que le prix, sinon ce n'est pas
@@ -277,6 +260,15 @@ class Produit(models.Model):
     def stock_total(self) -> int:
         return sum(v.stock for v in self.variantes.all())
 
+    @property
+    def univers(self) -> str:
+        """L'univers vient du rayon : une seule source de vérité."""
+        return self.rayon.univers
+
+    @property
+    def composition(self) -> str:
+        return ", ".join(self.matieres.values_list("nom", flat=True))
+
     def manque_pour_publier(self) -> list[str]:
         """
         Ce qui empêche encore la publication.
@@ -296,6 +288,8 @@ class Produit(models.Model):
             manques.append("une description d'au moins 20 caractères")
         if not self.sku.strip():
             manques.append("une référence interne")
+        if self.pk and not self.variantes.exists():
+            manques.append("au moins une taille ou option de vente")
         return manques
 
     @property

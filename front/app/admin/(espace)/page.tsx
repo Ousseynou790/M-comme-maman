@@ -103,7 +103,7 @@ export default function Page() {
           href="/admin/produits"
           titre="Produits"
           chiffre={String(products.length)}
-          legende="fiches au catalogue"
+          legende="produits au catalogue"
           description={
             stockFaible > 0
               ? `${stockFaible} produit${stockFaible > 1 ? "s" : ""} sous le seuil de stock`

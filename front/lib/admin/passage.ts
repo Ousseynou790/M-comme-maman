@@ -10,6 +10,7 @@ import type { RayonApi } from "@/lib/api";
 import type {
   AdminCategory,
   AdminColor,
+  AdminMaterial,
   AdminProduct,
   AdminPromotion,
   Customer,
@@ -29,18 +30,19 @@ export type ProduitGestionApi = {
   prix: number;
   prix_barre: number | null;
   description: string;
-  matiere: string;
+  matieres: number[];
+  matieres_noms: string[];
   rayon: number;
   rayon_nom: string;
   univers: string;
-  genre: string;
-  age: string;
   statut: "brouillon" | "publie" | "archive";
   photos: { id: number; media: number; url: string; position: number }[];
   variantes: {
     id: number;
     sku: string;
+    taille: number;
     taille_valeur: string;
+    coloris: number | null;
     coloris_nom: string;
     stock: number;
   }[];
@@ -62,8 +64,6 @@ export function versProduit(brut: ProduitGestionApi): AdminProduct {
     description: brut.description,
     category: brut.rayon_nom,
     univers: brut.univers as AdminProduct["univers"],
-    gender: (brut.genre || undefined) as AdminProduct["gender"],
-    age: (brut.age || undefined) as AdminProduct["age"],
     image: brut.photos[0]?.url ?? "",
     gallery: brut.photos.slice(1).map((p) => p.url),
     // Le stock d'une fiche est la somme de ses variantes : c'est la variante
@@ -72,6 +72,13 @@ export function versProduit(brut: ProduitGestionApi): AdminProduct {
     status: brut.statut,
     sizes: [...new Set(brut.variantes.map((v) => v.taille_valeur))],
     colors: [...new Set(brut.variantes.map((v) => v.coloris_nom).filter(Boolean))],
+    materials: brut.matieres_noms ?? [],
+    variants: brut.variantes.map((v) => ({
+      id: String(v.id),
+      size: v.taille_valeur,
+      color: v.coloris_nom ?? "",
+      stock: v.stock,
+    })),
     createdAt: brut.cree_le,
     updatedAt: brut.modifie_le,
   };
@@ -81,6 +88,7 @@ export function versProduit(brut: ProduitGestionApi): AdminProduct {
 export function depuisProduit(
   produit: AdminProduct,
   rayonsParNom: Map<string, number>,
+  matieresParNom: Map<string, number>,
 ): Record<string, unknown> {
   return {
     nom: produit.name,
@@ -89,10 +97,8 @@ export function depuisProduit(
     prix: produit.price,
     prix_barre: produit.compareAt ?? null,
     description: produit.description,
-    matiere: "",
+    matieres: produit.materials.map((nom) => matieresParNom.get(nom)).filter(Boolean),
     rayon: rayonsParNom.get(produit.category),
-    genre: produit.gender ?? "",
-    age: produit.age ?? "",
     statut: produit.status,
   };
 }
@@ -118,7 +124,7 @@ export function versCategorie(brut: RayonApi): AdminCategory {
     parentSlugs: brut.parents_slugs ?? [],
     parentNoms: brut.parents_noms ?? [],
     univers: (brut.univers as "enfant" | "maman") ?? "enfant",
-    active: true,
+    active: brut.visible,
     order: brut.ordre ?? 0,
   };
 }
@@ -219,7 +225,10 @@ const PORTEES: Record<string, AdminPromotion["target"]> = {
   commande: "commande",
 };
 
-export function versPromotion(brut: CampagneApi): AdminPromotion {
+export function versPromotion(
+  brut: CampagneApi,
+  rayonsParId: Map<number, string> = new Map(),
+): AdminPromotion {
   return {
     id: String(brut.id),
     name: brut.libelle,
@@ -228,7 +237,7 @@ export function versPromotion(brut: CampagneApi): AdminPromotion {
     startsAt: brut.date_effet,
     durationDays: brut.duree_jours,
     target: PORTEES[brut.portee] ?? "boutique",
-    categorySlug: "",
+    categorySlug: brut.rayon ? (rayonsParId.get(brut.rayon) ?? "") : "",
     productId: brut.produit ? String(brut.produit) : "",
     orderRule: brut.condition === "montant_minimum" ? "montant-minimum" : "premiere-commande",
     minAmount: brut.montant_minimum,
@@ -237,7 +246,10 @@ export function versPromotion(brut: CampagneApi): AdminPromotion {
   };
 }
 
-export function depuisPromotion(promotion: AdminPromotion): Record<string, unknown> {
+export function depuisPromotion(
+  promotion: AdminPromotion,
+  rayonsParSlug: Map<string, number> = new Map(),
+): Record<string, unknown> {
   const portees: Record<string, string> = {
     boutique: "boutique",
     categorie: "rayon",
@@ -251,6 +263,7 @@ export function depuisPromotion(promotion: AdminPromotion): Record<string, unkno
     date_effet: promotion.startsAt,
     duree_jours: promotion.durationDays,
     portee: portees[promotion.target] ?? "boutique",
+    rayon: promotion.categorySlug ? (rayonsParSlug.get(promotion.categorySlug) ?? null) : null,
     produit: promotion.productId ? Number(promotion.productId) : null,
     condition:
       promotion.orderRule === "montant-minimum" ? "montant_minimum" : "premiere",
@@ -274,6 +287,7 @@ export const versMedia = (brut: MediaApi): MediaItem => ({
 export type TailleApi = { id: number; valeur: string; repere: string; ordre: number };
 
 export const versTaille = (brut: TailleApi): SizeValue => ({
+  id: String(brut.id),
   value: brut.valeur,
   age: brut.repere,
 });
@@ -284,6 +298,13 @@ export const versColoris = (brut: ColorisApi): AdminColor => ({
   id: String(brut.id),
   name: brut.nom,
   hex: brut.hexa,
+});
+
+export type MatiereApi = { id: number; nom: string };
+
+export const versMatiere = (brut: MatiereApi): AdminMaterial => ({
+  id: String(brut.id),
+  name: brut.nom,
 });
 
 export type ReglagesApi = {

@@ -33,7 +33,7 @@ class VarianteEnLigne(admin.TabularInline):
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
     list_display = ["nom", "sku", "prix", "rayon", "statut", "stock_total", "publiable"]
-    list_filter = ["statut", "rayon", "genre", "age"]
+    list_filter = ["statut", "rayon", "matieres"]
     search_fields = ["nom", "sku", "slug"]
     prepopulated_fields = {"slug": ["nom"]}
     inlines = [PhotoEnLigne, VarianteEnLigne]

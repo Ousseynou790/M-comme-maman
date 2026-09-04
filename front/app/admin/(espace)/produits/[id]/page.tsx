@@ -14,12 +14,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   /* Avant l'hydratation, la graine est déjà là : une fiche introuvable à ce
      moment-là l'est vraiment. On attend quand même la relecture du stockage,
      sinon une fiche créée dans une session précédente s'annoncerait absente. */
-  if (!hydrated) return <p className="text-[13px] text-muted">Ouverture de la fiche…</p>;
+  if (!hydrated) return <p className="text-[13px] text-muted">Ouverture du produit…</p>;
 
   if (!fiche) {
     return (
       <EmptyState
-        title="Fiche introuvable"
+        title="Produit introuvable"
         hint="Elle a peut-être été supprimée depuis un autre onglet."
         action={
           <Link href="/admin/produits">

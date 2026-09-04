@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatXOF } from "@/lib/format";
 import { REFERENCE_DATE, useAdmin } from "@/lib/admin/store";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin/types";
 import {
   Button,
+  DeleteButton,
   EmptyState,
   Field,
   Input,
@@ -24,7 +25,13 @@ import {
   Toggle,
   usePagination,
 } from "@/components/admin/ui";
-import { IconCheck, IconPencil, IconPlus, IconTrash } from "@/components/admin/icons";
+import {
+  IconCheck,
+  IconGrid,
+  IconMenuAdmin,
+  IconPencil,
+  IconPlus,
+} from "@/components/admin/icons";
 
 /** Durées proposées, pour éviter de compter les jours à la main. */
 const DUREES = [
@@ -61,6 +68,7 @@ const FILTRES = [
   { value: "terminees", label: "Terminées" },
 ] as const;
 type Filtre = (typeof FILTRES)[number]["value"];
+type Affichage = "liste" | "grille";
 
 type Statut = "En cours" | "Programmée" | "Terminée" | "Désactivée";
 
@@ -100,8 +108,18 @@ const jour = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("fr
 export default function Page() {
   const { promotions, categories, products, savePromotion, deletePromotion, hydrated } = useAdmin();
   const [brouillon, setBrouillon] = useState<AdminPromotion | null>(null);
-  const [enregistre, setEnregistre] = useState(false);
   const [filtre, setFiltre] = useState<Filtre>("toutes");
+  const [affichage, setAffichage] = useState<Affichage>("grille");
+
+  useEffect(() => {
+    const prefere = window.localStorage.getItem("mcm-promotions-affichage");
+    if (prefere === "liste" || prefere === "grille") setAffichage(prefere);
+  }, []);
+
+  const choisirAffichage = (valeur: Affichage) => {
+    setAffichage(valeur);
+    window.localStorage.setItem("mcm-promotions-affichage", valeur);
+  };
 
   /* Même date de référence que le tableau de bord : la graine est figée au
      15 août 2026, une campagne « en cours » doit l'être par rapport à elle. */
@@ -136,7 +154,7 @@ export default function Page() {
     return s === "Terminée" || s === "Désactivée";
   });
 
-  /* Les campagnes s'accumulent au fil des saisons : on en montre six par page. */
+  /* Les cartes sont compactes : douze campagnes tiennent confortablement sur une page. */
   const {
     page,
     pages,
@@ -144,7 +162,7 @@ export default function Page() {
     tranche,
     debut,
     total: totalPage,
-  } = usePagination(visibles, 6, (p) => p.id);
+  } = usePagination(visibles, 12, (p) => p.id);
 
   /** Ce sur quoi porte la remise, en une phrase. */
   const porteeLisible = (p: AdminPromotion) => {
@@ -156,6 +174,24 @@ export default function Page() {
     return p.orderRule === "premiere-commande"
       ? "Première commande"
       : `Commande dès ${formatXOF(p.minAmount)}`;
+  };
+
+  const resumeCampagne = (p: AdminPromotion) => {
+    const fin = promotionEndDate(p);
+    const statut = statutDe(p, aujourdhui);
+    const vive = statut === "En cours" || statut === "Programmée";
+    const total = Math.max(1, p.durationDays);
+    const ecoules = Math.round(
+      (REFERENCE_DATE.getTime() - new Date(`${p.startsAt}T00:00:00`).getTime()) / 86_400_000,
+    );
+    const avance = Math.min(100, Math.max(0, (ecoules / total) * 100));
+    const legende =
+      statut === "En cours"
+        ? `${Math.max(1, total - ecoules)} j restants`
+        : statut === "Programmée"
+          ? `dans ${Math.max(1, -ecoules)} j`
+          : `${total} jours`;
+    return { fin, statut, vive, avance, legende };
   };
 
   const valide = (d: AdminPromotion) => {
@@ -176,8 +212,6 @@ export default function Page() {
       description: brouillon.description.trim(),
     });
     setBrouillon(null);
-    setEnregistre(true);
-    window.setTimeout(() => setEnregistre(false), 2200);
   };
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture des campagnes…</p>;
@@ -195,18 +229,39 @@ export default function Page() {
             : "Aucune remise active en boutique en ce moment."
         }
       >
+        <div
+          className="flex h-10 items-center rounded-xl border border-line bg-white p-1"
+          role="group"
+          aria-label="Mode d'affichage"
+        >
+          <button
+            type="button"
+            onClick={() => choisirAffichage("liste")}
+            aria-pressed={affichage === "liste"}
+            title="Affichage horizontal"
+            className={`grid h-8 w-9 place-items-center rounded-lg transition-colors ${
+              affichage === "liste" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+            }`}
+          >
+            <IconMenuAdmin />
+          </button>
+          <button
+            type="button"
+            onClick={() => choisirAffichage("grille")}
+            aria-pressed={affichage === "grille"}
+            title="Affichage par vignettes"
+            className={`grid h-8 w-9 place-items-center rounded-lg transition-colors ${
+              affichage === "grille" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+            }`}
+          >
+            <IconGrid />
+          </button>
+        </div>
         <Button variant="rose" onClick={() => setBrouillon(vide())}>
           <IconPlus />
           Nouvelle promotion
         </Button>
       </PageHeader>
-
-      {enregistre && (
-        <p className="anim-fade-up mb-5 flex items-center gap-2 rounded-2xl bg-[#eaf6ef] px-4 py-3 text-[13px] font-semibold text-[#2e7d52]">
-          <IconCheck className="h-4 w-4" />
-          Promotion enregistrée.
-        </p>
-      )}
 
       <div className="mb-5">
         <Pills
@@ -232,116 +287,98 @@ export default function Page() {
           }
         />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {tranche.map((p) => {
-            const fin = promotionEndDate(p);
-            const statut = statutDe(p, aujourdhui);
-            const vive = statut === "En cours" || statut === "Programmée";
-
-            /* Avancement de la campagne, pour la barre sous les dates. */
-            const total = Math.max(1, p.durationDays);
-            const ecoules = Math.round(
-              (REFERENCE_DATE.getTime() - new Date(`${p.startsAt}T00:00:00`).getTime()) / 86_400_000
-            );
-            const avance = Math.min(100, Math.max(0, (ecoules / total) * 100));
-            const legende =
-              statut === "En cours"
-                ? `${Math.max(1, total - ecoules)} j restants`
-                : statut === "Programmée"
-                  ? `dans ${Math.max(1, -ecoules)} j`
-                  : `${total} jours`;
-
-            return (
-              <article
-                key={p.id}
-                className="group flex overflow-hidden rounded-[22px] border border-line bg-white transition-all duration-400 ease-soft hover:-translate-y-0.5 hover:border-rose/40"
-              >
-                {/* Le talon du bon de réduction : la remise, en grand. */}
-                <div
-                  className={`relative grid w-[86px] shrink-0 place-items-center px-2 text-center sm:w-[112px] ${
-                    !vive
-                      ? "bg-mist text-muted"
-                      : p.type === "pourcentage"
-                        ? "bg-linear-to-br from-rose to-rose-deep text-white"
-                        : "bg-linear-to-br from-ink to-[#3d2f35] text-white"
-                  }`}
-                >
-                  <div>
-                    <p className="text-[22px] font-extrabold leading-none tracking-[-.03em] tabular-nums sm:text-[26px]">
-                      {p.type === "pourcentage"
-                        ? `−${p.value} %`
-                        : `−${p.value.toLocaleString("fr-FR")}`}
-                    </p>
-                    <p className="mt-1.5 text-[9px] uppercase tracking-[.18em] opacity-75">
-                      {p.type === "pourcentage" ? "de remise" : "F CFA"}
-                    </p>
-                  </div>
-                  {/* Encoches et pointillé : ce qui fait lire « bon de réduction ». */}
-                  <span className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-[#faf8f9]" />
-                  <span className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full bg-[#faf8f9]" />
-                  <span className="absolute inset-y-4 right-0 border-r border-dashed border-current opacity-30" />
-                </div>
-
-                <div className="min-w-0 flex-1 p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-[15px] font-extrabold tracking-tight">
-                        {p.name || "Sans nom"}
-                      </h2>
-                      <span className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-mist px-2.5 py-1 text-[11px] text-muted">
-                        <span className="truncate">{porteeLisible(p)}</span>
-                      </span>
-                    </div>
-                    <span
-                      className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-bold"
-                      style={{ background: TEINTES[statut].bg, color: TEINTES[statut].fg }}
-                    >
-                      {statut}
-                    </span>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted">
-                      <span className="tabular-nums">
+        affichage === "liste" ? (
+          <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+            <table className="w-full min-w-[900px] border-collapse text-left">
+              <thead className="bg-rose-soft/70 text-[11px] font-bold uppercase text-muted">
+                <tr>
+                  <th className="px-5 py-3.5">Promotion</th>
+                  <th className="px-4 py-3.5">Réduction</th>
+                  <th className="px-4 py-3.5">S'applique à</th>
+                  <th className="px-4 py-3.5">Période</th>
+                  <th className="px-4 py-3.5">Statut</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f3ecef]">
+                {tranche.map((p) => {
+                  const { fin, statut } = resumeCampagne(p);
+                  return (
+                    <tr key={p.id} className="transition-colors hover:bg-mist/60">
+                      <td className="px-5 py-3.5">
+                        <p className="max-w-[250px] truncate text-[13.5px] font-extrabold">{p.name || "Sans nom"}</p>
+                        {p.description && <p className="mt-0.5 max-w-[250px] truncate text-[11.5px] text-muted">{p.description}</p>}
+                      </td>
+                      <td className="px-4 py-3.5 text-[13px] font-extrabold text-rose-deep">
+                        {p.type === "pourcentage" ? `−${p.value} %` : `−${formatXOF(p.value)}`}
+                      </td>
+                      <td className="px-4 py-3.5 text-[12.5px] text-muted">{porteeLisible(p)}</td>
+                      <td className="px-4 py-3.5 text-[11.5px] tabular-nums text-muted">
                         {jour(p.startsAt)} → {jour(fin)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="rounded-full px-2.5 py-1 text-[10.5px] font-bold" style={{ background: TEINTES[statut].bg, color: TEINTES[statut].fg }}>
+                          {statut}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setBrouillon({ ...p })} title="Modifier">
+                            <IconPencil />
+                          </Button>
+                          <DeleteButton onConfirm={() => deletePromotion(p.id)} label="" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {tranche.map((p) => {
+              const { fin, statut, vive, avance, legende } = resumeCampagne(p);
+              return (
+                <article key={p.id} className="rounded-2xl border border-line bg-white p-4 transition hover:-translate-y-0.5 hover:border-rose/40">
+                  <div className="flex items-start gap-3">
+                    <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-xl text-center ${
+                      !vive ? "bg-mist text-muted" : p.type === "pourcentage" ? "bg-rose text-white" : "bg-ink text-white"
+                    }`}>
+                      <span className="text-[15px] font-extrabold leading-tight tabular-nums">
+                        {p.type === "pourcentage" ? `−${p.value}%` : `−${p.value.toLocaleString("fr-FR")}`}
                       </span>
-                      <span className="tabular-nums">{legende}</span>
                     </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone">
-                      <span
-                        className={`block h-full rounded-full transition-[width] duration-700 ease-soft ${
-                          vive ? "bg-rose" : "bg-muted/40"
-                        }`}
-                        style={{ width: `${avance}%` }}
-                      />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-[13.5px] font-extrabold">{p.name || "Sans nom"}</h2>
+                      <p className="mt-1 truncate text-[11px] text-muted">{porteeLisible(p)}</p>
+                      <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-[9.5px] font-bold" style={{ background: TEINTES[statut].bg, color: TEINTES[statut].fg }}>
+                        {statut}
+                      </span>
                     </div>
                   </div>
 
-                  {p.description && (
-                    <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-muted">
-                      {p.description}
-                    </p>
-                  )}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between gap-2 text-[10.5px] text-muted">
+                      <span className="truncate tabular-nums">{jour(p.startsAt)} → {jour(fin)}</span>
+                      <span className="shrink-0 tabular-nums">{legende}</span>
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-stone">
+                      <span className={`block h-full rounded-full ${vive ? "bg-rose" : "bg-muted/40"}`} style={{ width: `${avance}%` }} />
+                    </div>
+                  </div>
 
-                  <div className="mt-4 flex justify-end gap-1.5">
-                    <Button size="sm" variant="contour" onClick={() => setBrouillon({ ...p })}>
+                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-line pt-2.5">
+                    <Button size="sm" variant="ghost" onClick={() => setBrouillon({ ...p })} title="Modifier">
                       <IconPencil />
-                      Modifier
                     </Button>
-                    <button
-                      type="button"
-                      onClick={() => deletePromotion(p.id)}
-                      aria-label={`Supprimer ${p.name}`}
-                      className="grid h-8 w-8 place-items-center rounded-full text-muted transition-colors hover:bg-rose-soft hover:text-rose-deep"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </button>
+                    <DeleteButton onConfirm={() => deletePromotion(p.id)} label="" />
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
+        )
       )}
 
       <Pagination

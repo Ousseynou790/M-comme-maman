@@ -10,7 +10,7 @@
  */
 
 import { lire, type Page, type ProduitApi, type RayonApi } from "./api";
-import type { Age, Gender, Product, Univers } from "./products";
+import type { Product, Univers } from "./products";
 
 /** Un produit du serveur, mis à la forme que les composants connaissent déjà. */
 export function versProduit(brut: ProduitApi): Product {
@@ -26,8 +26,6 @@ export function versProduit(brut: ProduitApi): Product {
     promotion: brut.promotion ?? undefined,
     category: brut.rayon_nom,
     univers: brut.univers as Univers,
-    gender: (brut.genre || undefined) as Gender | undefined,
-    age: (brut.age || undefined) as Age | undefined,
     image: brut.image,
     description: brut.description,
     outOfStock: brut.en_rupture,
@@ -37,8 +35,6 @@ export function versProduit(brut: ProduitApi): Product {
 export type FiltresCatalogue = {
   univers?: Univers;
   rayon?: string;
-  genre?: string;
-  age?: string;
   taille?: string;
   promo?: boolean;
   q?: string;
@@ -49,8 +45,6 @@ function requete(filtres: FiltresCatalogue): string {
   const params = new URLSearchParams();
   if (filtres.univers) params.set("univers", filtres.univers);
   if (filtres.rayon) params.set("rayon", filtres.rayon);
-  if (filtres.genre) params.set("genre", filtres.genre);
-  if (filtres.age) params.set("age", filtres.age);
   if (filtres.taille) params.set("taille", filtres.taille);
   if (filtres.promo) params.set("promo", "1");
   if (filtres.q) params.set("q", filtres.q);

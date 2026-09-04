@@ -85,7 +85,7 @@ export function FavoritesPage() {
               <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
             </Link>
             <Link
-              href="/boutique?age=2-10"
+              href="/boutique"
               className="inline-flex items-center justify-center rounded-full border-[1.5px] border-[#e5d9de] bg-white px-7 py-3.5 text-[14px] font-bold transition-colors duration-300 hover:border-rose hover:text-rose"
             >
               Voir le rayon bébé

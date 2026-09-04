@@ -234,10 +234,10 @@ class Command(BaseCommand):
                 defaults={
                     "nom": nom, "sku": sku, "prix": prix, "prix_barre": prix_barre,
                     "description": description, "rayon": rayons[rayon],
-                    "genre": genre, "age": age, "statut": statut,
-                    "matiere": alea.choice(MATIERES),
+                    "statut": statut,
                 },
             )
+            produit.matieres.set([Matiere.objects.get(nom=alea.choice(MATIERES))])
             PhotoProduit.objects.get_or_create(produit=produit, media=media, defaults={"position": 0})
 
             valeurs = POINTURES if rayon == "Chaussures" else TAILLES_PAR_AGE[age]
@@ -265,8 +265,7 @@ class Command(BaseCommand):
                 slug=slug,
                 defaults={
                     "nom": nom, "sku": sku, "prix": prix, "description": description,
-                    "rayon": rayons[rayon], "univers": Univers.MAMAN,
-                    "genre": "", "age": "", "statut": Produit.Statut.PUBLIE,
+                    "rayon": rayons[rayon], "statut": Produit.Statut.PUBLIE,
                 },
             )
             PhotoProduit.objects.get_or_create(produit=produit, media=media, defaults={"position": 0})

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatXOF, waLink } from "@/lib/format";
+import { formatXOF, jusquAu, waLink } from "@/lib/format";
 import type { ProduitApi } from "@/lib/api";
 import type { Product } from "@/lib/products";
 import { ProductCard } from "./product-card";
@@ -87,14 +87,8 @@ export function ProductDetail({
   const blocks = [
     { t: "Description", c: product.description },
     {
-      t: "Composition et entretien",
-      c: [
-        fiche.matiere,
-        "Lavage machine à 30°, séchage à plat.",
-        "Repassage doux sur l'envers.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      t: "Composition",
+      c: fiche.matiere,
     },
     {
       t: "Livraison et retours",
@@ -182,8 +176,17 @@ export function ProductDetail({
             )}
           </div>
 
-          <div className="mt-5 flex items-baseline gap-3">
-            <span className="text-[30px] font-extrabold tracking-[-.03em]">{formatXOF(product.price)}</span>
+          {/* En promotion, le prix du jour passe en rose et l'ancien s'efface.
+              Deux prix de même poids se lisent mal, et c'est le nouveau qu'on
+              veut voir en premier. */}
+          <div className="mt-5 flex flex-wrap items-baseline gap-3">
+            <span
+              className={`text-[30px] font-extrabold tracking-[-.03em] ${
+                product.compareAt ? "text-rose" : ""
+              }`}
+            >
+              {formatXOF(product.price)}
+            </span>
             {product.compareAt && (
               <span className="text-base text-[#9c8d93] line-through">{formatXOF(product.compareAt)}</span>
             )}
@@ -193,6 +196,19 @@ export function ProductDetail({
               </span>
             )}
           </div>
+
+          {/* La campagne se nomme : « −15 % » ne dit pas pourquoi, ni jusqu'à
+              quand. Une remise sans échéance n'en presse aucune. */}
+          {product.promotion && (
+            <p className="mt-2.5 inline-flex flex-wrap items-baseline gap-x-2 rounded-2xl bg-rose-soft px-4 py-2.5 text-[13px] leading-relaxed text-rose-deep">
+              <strong className="font-bold">{product.promotion.libelle}</strong>
+              <span>
+                vous économisez {formatXOF(product.promotion.economie)}, jusqu&apos;au{" "}
+                {jusquAu(product.promotion.jusquau)}
+              </span>
+            </p>
+          )}
+
           <p className="mt-1.5 text-[12.5px] text-muted">
             Taxes incluses. Livraison calculée à l&apos;étape suivante.
           </p>
@@ -225,7 +241,6 @@ export function ProductDetail({
             <div className="mt-6">
               <div className="mb-3 flex items-baseline justify-between">
                 <span className="text-[13px] font-bold">Taille</span>
-                <span className="text-[13px] font-semibold text-rose">Guide des tailles</span>
               </div>
               <div className="flex flex-wrap gap-2.5">
                 {tailles.map((t) => {

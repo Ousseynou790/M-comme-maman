@@ -109,10 +109,19 @@ export function QuickView({ product, onClose }: { product: Product | null; onClo
 
           <h2 className="mt-3.5 text-[28px] font-extrabold tracking-tight">{product.name}</h2>
 
-          <div className="mt-3 flex items-baseline gap-2.5">
-            <span className="text-2xl font-extrabold">{formatXOF(product.price)}</span>
+          <div className="mt-3 flex flex-wrap items-baseline gap-2.5">
+            <span className={`text-2xl font-extrabold ${product.compareAt ? "text-rose" : ""}`}>
+              {formatXOF(product.price)}
+            </span>
             {product.compareAt && (
-              <span className="text-[15px] text-muted line-through">{formatXOF(product.compareAt)}</span>
+              <>
+                <span className="text-[15px] text-muted line-through">
+                  {formatXOF(product.compareAt)}
+                </span>
+                <span className="rounded-full bg-rose-soft px-2.5 py-1 text-[11.5px] font-bold text-rose-deep">
+                  −{Math.round((1 - product.price / product.compareAt) * 100)} %
+                </span>
+              </>
             )}
           </div>
 

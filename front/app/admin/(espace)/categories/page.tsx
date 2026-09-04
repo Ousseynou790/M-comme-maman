@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAdmin } from "@/lib/admin/store";
 import { slugify } from "@/lib/admin/seed";
 import type { AdminCategory } from "@/lib/admin/types";
@@ -12,12 +12,21 @@ import {
   Input,
   Modal,
   PageHeader,
+  Pagination,
   SearchField,
-  Section,
   Textarea,
   Toggle,
+  usePagination,
 } from "@/components/admin/ui";
-import { IconCheck, IconPlus, IconTrash } from "@/components/admin/icons";
+import {
+  IconCheck,
+  IconGrid,
+  IconImage,
+  IconMenuAdmin,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+} from "@/components/admin/icons";
 
 /**
  * Les rayons de la boutique, sur deux niveaux.
@@ -30,6 +39,8 @@ import { IconCheck, IconPlus, IconTrash } from "@/components/admin/icons";
  */
 
 type Genre = "categorie" | "sous-categorie";
+type Affichage = "liste" | "grille";
+type FiltreType = "categories" | "sous-categories";
 
 const vide = (parentSlugs: string[] = []): AdminCategory => ({
   id: `cat-${Date.now().toString(36)}`,
@@ -44,13 +55,58 @@ const vide = (parentSlugs: string[] = []): AdminCategory => ({
   order: 99,
 });
 
+function VisuelCategorie({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+}) {
+  return (
+    <span className={`relative block shrink-0 overflow-hidden bg-stone ${className}`}>
+      {src ? (
+        // Les médias peuvent venir de la photothèque ou d'une adresse distante.
+        // Un img natif accepte les deux sans configuration de domaine Next.js.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} className="h-full w-full object-cover" />
+      ) : (
+        <span className="grid h-full w-full place-items-center text-[#c8b9bf]">
+          <IconImage className="h-5 w-5" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function Page() {
   const { categories, products, saveCategory, deleteCategory, hydrated } = useAdmin();
   const [edite, setEdite] = useState<{ rayon: AdminCategory; genre: Genre } | null>(null);
   /* La catégorie dont on choisit les sous-catégories, s'il y en a une d'ouverte. */
   const [rattache, setRattache] = useState<AdminCategory | null>(null);
+  const [suppression, setSuppression] = useState<AdminCategory | null>(null);
+  const [destination, setDestination] = useState("");
+  const [affichage, setAffichage] = useState<Affichage>("liste");
+  const [recherche, setRecherche] = useState("");
+  const [filtreType, setFiltreType] = useState<FiltreType>("categories");
+
+  useEffect(() => {
+    const prefere = window.localStorage.getItem("mcm-categories-affichage");
+    if (prefere === "liste" || prefere === "grille") {
+      setAffichage(prefere);
+    } else if (window.matchMedia("(max-width: 1023px)").matches) {
+      setAffichage("grille");
+    }
+  }, []);
+
+  const choisirAffichage = (valeur: Affichage) => {
+    setAffichage(valeur);
+    window.localStorage.setItem("mcm-categories-affichage", valeur);
+  };
 
   const compte = (slug: string) => products.filter((p) => slugify(p.category) === slug).length;
+  const produitsDe = (c: AdminCategory) => products.filter((p) => slugify(p.category) === c.slug);
 
   const racines = categories
     .filter((c) => c.parentSlugs.length === 0)
@@ -60,25 +116,70 @@ export default function Page() {
     categories.filter((c) => c.parentSlugs.includes(slug)).sort((a, b) => a.order - b.order);
 
   const sousCategories = categories.filter((c) => c.parentSlugs.length > 0);
+  const categoriesAffichees = [...categories]
+    .sort((a, b) => {
+      if (a.parentSlugs.length === 0 && b.parentSlugs.length > 0) return -1;
+      if (a.parentSlugs.length > 0 && b.parentSlugs.length === 0) return 1;
+      return a.order - b.order || a.label.localeCompare(b.label, "fr");
+    })
+    .filter((c) => {
+      if (filtreType === "categories" && c.parentSlugs.length > 0) return false;
+      if (filtreType === "sous-categories" && c.parentSlugs.length === 0) return false;
+      const terme = recherche.trim().toLocaleLowerCase("fr");
+      return !terme || `${c.label} ${c.description} ${c.parentNoms.join(" ")}`.toLocaleLowerCase("fr").includes(terme);
+    });
+  const {
+    page: pageCategories,
+    pages: pagesCategories,
+    setPage: setPageCategories,
+    tranche: categoriesPage,
+    debut: debutCategories,
+    total: totalCategories,
+  } = usePagination(categoriesAffichees, affichage === "grille" ? 12 : 15, (c) => c.id);
 
   /* Le serveur refuse de supprimer un rayon qui porte encore des fiches ou des
      sous-catégories : les fiches deviendraient orphelines. On le sait avant de
      cliquer, autant le dire au lieu de laisser l'appel échouer. */
   const empeche = (c: AdminCategory) => {
-    const fiches = compte(c.slug);
+    const fiches = produitsDe(c).filter((p) => p.status !== "brouillon").length;
     const enfants = enfantsDe(c.slug).length;
     if (fiches > 0 && enfants > 0) {
-      return `Contient ${fiches} fiche${fiches > 1 ? "s" : ""} et ${enfants} sous-catégorie${
+      return `Contient ${fiches} produit${fiches > 1 ? "s" : ""} et ${enfants} sous-catégorie${
         enfants > 1 ? "s" : ""
       } : déplacez-les d'abord.`;
     }
     if (fiches > 0) {
-      return `Contient ${fiches} fiche${fiches > 1 ? "s" : ""} : déplacez-les dans un autre rayon d'abord.`;
+      return `Contient ${fiches} produit${fiches > 1 ? "s" : ""} : déplacez-les dans un autre rayon d'abord.`;
     }
     if (enfants > 0) {
       return `Contient ${enfants} sous-catégorie${enfants > 1 ? "s" : ""} : supprimez-les d'abord.`;
     }
     return undefined;
+  };
+
+  const demanderSuppression = (c: AdminCategory) => {
+    setSuppression(c);
+    setDestination(categories.find((autre) => autre.id !== c.id)?.id ?? "");
+  };
+
+  const boutonSuppression = (c: AdminCategory, label = "Supprimer") => {
+    const blocage = empeche(c);
+    const brouillons = produitsDe(c).filter((p) => p.status === "brouillon").length;
+    if (!blocage && brouillons > 0) {
+      return (
+        <Button size="sm" variant="ghost" onClick={() => demanderSuppression(c)}>
+          <IconTrash />
+          {label}
+        </Button>
+      );
+    }
+    return (
+      <DeleteButton
+        onConfirm={() => deleteCategory(c.id)}
+        empeche={blocage}
+        label={label}
+      />
+    );
   };
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture des catégories…</p>;
@@ -107,140 +208,223 @@ export default function Page() {
           <IconPlus />
           Nouvelle sous-catégorie
         </Button>
+        <div
+          className="flex h-10 items-center rounded-xl border border-line bg-white p-1"
+          role="group"
+          aria-label="Mode d'affichage"
+        >
+          <button
+            type="button"
+            onClick={() => choisirAffichage("liste")}
+            aria-pressed={affichage === "liste"}
+            title="Affichage horizontal"
+            className={`grid h-8 w-9 place-items-center rounded-lg transition-colors ${
+              affichage === "liste" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+            }`}
+          >
+            <IconMenuAdmin />
+          </button>
+          <button
+            type="button"
+            onClick={() => choisirAffichage("grille")}
+            aria-pressed={affichage === "grille"}
+            title="Affichage par vignettes"
+            className={`grid h-8 w-9 place-items-center rounded-lg transition-colors ${
+              affichage === "grille" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+            }`}
+          >
+            <IconGrid />
+          </button>
+        </div>
       </PageHeader>
 
-      {racines.length === 0 ? (
+      {categories.length === 0 ? (
         <EmptyState
           title="Aucune catégorie pour le moment"
           hint="Commencez par une catégorie — « Enfants », « Coin maman » — puis rangez des sous-catégories à l'intérieur."
         />
       ) : (
-        <div className="flex flex-col gap-4">
-          {racines.map((racine) => {
-            const enfants = enfantsDe(racine.slug);
-            return (
-              <Section key={racine.id} className={racine.active ? "" : "opacity-60"}>
-                <div className="flex flex-wrap items-start gap-3.5">
-                  <span
-                    className="h-16 w-14 shrink-0 rounded-xl bg-stone bg-cover bg-center"
-                    style={racine.image ? { backgroundImage: `url(${racine.image})` } : undefined}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-[15px] font-extrabold tracking-tight">{racine.label}</h2>
-                      {!racine.active && (
-                        <span className="rounded-full bg-stone px-2 py-0.5 text-[10.5px] font-bold text-muted">
-                          Masquée
-                        </span>
+        <>
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="min-w-0 flex-1">
+              <SearchField
+                value={recherche}
+                onChange={setRecherche}
+                placeholder={
+                  filtreType === "categories"
+                    ? "Rechercher une catégorie"
+                    : "Rechercher une sous-catégorie"
+                }
+              />
+            </div>
+            <div
+              className="flex w-full rounded-xl border border-line bg-white p-1 lg:w-auto"
+              role="group"
+              aria-label="Filtrer les catégories"
+            >
+              <button
+                type="button"
+                onClick={() => setFiltreType("categories")}
+                aria-pressed={filtreType === "categories"}
+                className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-[12.5px] font-bold transition-colors lg:flex-none ${
+                  filtreType === "categories" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+                }`}
+              >
+                Catégories · {racines.length}
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltreType("sous-categories")}
+                aria-pressed={filtreType === "sous-categories"}
+                className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-[12.5px] font-bold transition-colors lg:flex-none ${
+                  filtreType === "sous-categories" ? "bg-ink text-white" : "text-muted hover:bg-mist"
+                }`}
+              >
+                Sous-catégories · {sousCategories.length}
+              </button>
+            </div>
+          </div>
+
+          {affichage === "liste" ? (
+            <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+              <table className="w-full min-w-[820px] border-collapse text-left">
+                <thead className="bg-rose-soft/70 text-[11px] font-bold uppercase text-muted">
+                  <tr>
+                    <th className="px-5 py-3.5">Catégorie</th>
+                    <th className="px-4 py-3.5">
+                      {filtreType === "categories" ? "Sous-catégories" : "Catégorie"}
+                    </th>
+                    <th className="px-4 py-3.5">Produits</th>
+                    <th className="px-4 py-3.5">Statut</th>
+                    <th className="px-5 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f3ecef]">
+                  {categoriesPage.map((categorie) => {
+                    const principale = categorie.parentSlugs.length === 0;
+                    return (
+                      <tr key={categorie.id} className="transition-colors hover:bg-mist/60">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <VisuelCategorie
+                              src={categorie.image}
+                              alt={categorie.label}
+                              className="h-12 w-12 rounded-xl"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-[13.5px] font-extrabold">{categorie.label}</p>
+                              {categorie.description && (
+                                <p className="mt-0.5 max-w-[34ch] truncate text-[11.5px] text-muted">
+                                  {categorie.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {principale ? (
+                            <span className="text-[12.5px] font-bold">
+                              {enfantsDe(categorie.slug).length}
+                            </span>
+                          ) : (
+                            <div className="flex max-w-[250px] flex-wrap gap-1">
+                              {categorie.parentNoms.map((nom) => (
+                                <span key={nom} className="rounded-full bg-mist px-2 py-1 text-[10.5px] font-bold text-muted">
+                                  {nom}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-[12.5px] font-bold">{compte(categorie.slug)}</td>
+                        <td className="px-4 py-3.5">
+                          <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-bold ${
+                            categorie.active ? "bg-[#e8f5ed] text-[#24784b]" : "bg-stone text-muted"
+                          }`}>
+                            {categorie.active ? "Visible" : "Masquée"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-1">
+                            {principale && (
+                              <Button size="sm" variant="ghost" onClick={() => setRattache(categorie)} title="Gérer les sous-catégories">
+                                <IconPlus />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEdite({ rayon: categorie, genre: principale ? "categorie" : "sous-categorie" })}
+                              title="Modifier"
+                            >
+                              <IconPencil />
+                            </Button>
+                            {boutonSuppression(categorie, "")}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {categoriesPage.map((categorie) => {
+                const principale = categorie.parentSlugs.length === 0;
+                return (
+                  <article key={categorie.id} className="group overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:border-rose/40">
+                    <div className="relative aspect-[16/9] bg-stone">
+                      <VisuelCategorie src={categorie.image} alt={categorie.label} className="h-full w-full" />
+                      {!categorie.active && (
+                        <span className="absolute right-3 top-3 rounded-full bg-ink/80 px-2.5 py-1 text-[10px] font-bold text-white">Masquée</span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-[11.5px] text-muted">
-                      /{racine.slug} · {compte(racine.slug)} fiche
-                      {compte(racine.slug) > 1 ? "s" : ""} · {enfants.length} sous-catégorie
-                      {enfants.length > 1 ? "s" : ""}
-                    </p>
-                    {racine.description && (
-                      <p className="mt-2 line-clamp-2 text-[12.5px] leading-relaxed text-muted">
-                        {racine.description}
-                      </p>
-                    )}
-                  </div>
+                    <div className="p-4">
+                      <h2 className="truncate text-[15px] font-extrabold">{categorie.label}</h2>
+                      {categorie.description && (
+                        <p className="mt-1 line-clamp-2 min-h-9 text-[12px] leading-relaxed text-muted">{categorie.description}</p>
+                      )}
+                      <div className="mt-3 flex min-h-7 flex-wrap items-center gap-1.5">
+                        <span className="text-[11.5px] font-bold text-muted">
+                          {compte(categorie.slug)} produit{compte(categorie.slug) > 1 ? "s" : ""}
+                        </span>
+                        {principale && (
+                          <span className="rounded-full bg-mist px-2 py-1 text-[10px] font-bold text-muted">
+                            {enfantsDe(categorie.slug).length} sous-catégorie{enfantsDe(categorie.slug).length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {!principale && categorie.parentNoms.map((nom) => (
+                          <span key={nom} className="rounded-full bg-mist px-2 py-1 text-[10px] font-bold text-muted">{nom}</span>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-line pt-3">
+                        {principale && (
+                          <Button size="sm" variant="ghost" onClick={() => setRattache(categorie)} title="Gérer les sous-catégories"><IconPlus /></Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => setEdite({ rayon: categorie, genre: principale ? "categorie" : "sous-categorie" })} title="Modifier"><IconPencil /></Button>
+                        {boutonSuppression(categorie, "")}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setRattache(racine)}
-                      title={`Choisir les sous-catégories de « ${racine.label} »`}
-                    >
-                      <IconPlus />
-                      Sous-catégorie
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEdite({ rayon: racine, genre: "categorie" })}
-                    >
-                      Modifier
-                    </Button>
-                    <DeleteButton
-                      onConfirm={() => deleteCategory(racine.id)}
-                      empeche={empeche(racine)}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 border-t border-line pt-3.5">
-                  {enfants.length === 0 ? (
-                    <p className="text-[12.5px] text-muted">
-                      Aucune sous-catégorie. Le bouton ci-dessus en ajoute une dans ce rayon.
-                    </p>
-                  ) : (
-                    <ul className="flex flex-col divide-y divide-[#f4edf0]">
-                      {enfants.map((enfant) => {
-                        /* Une sous-catégorie rangée ailleurs aussi : on le dit,
-                           sinon la modifier ici semblerait sans conséquence. */
-                        const ailleurs = enfant.parentNoms.filter((n) => n !== racine.label);
-                        return (
-                          <li
-                            key={enfant.id}
-                            className={`flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0 ${
-                              enfant.active ? "" : "opacity-60"
-                            }`}
-                          >
-                            <span
-                              className="h-9 w-8 shrink-0 rounded-lg bg-stone bg-cover bg-center"
-                              style={
-                                enfant.image
-                                  ? { backgroundImage: `url(${enfant.image})` }
-                                  : undefined
-                              }
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-2">
-                                <span className="text-[13.5px] font-bold">{enfant.label}</span>
-                                {ailleurs.length > 0 && (
-                                  <span className="rounded-full bg-rose-soft px-2 py-0.5 text-[10px] font-bold text-rose-deep">
-                                    aussi dans {ailleurs.join(", ")}
-                                  </span>
-                                )}
-                                {!enfant.active && (
-                                  <span className="rounded-full bg-stone px-2 py-0.5 text-[10px] font-bold text-muted">
-                                    Masquée
-                                  </span>
-                                )}
-                              </span>
-                              <span className="mt-0.5 block text-[11.5px] text-muted">
-                                /{enfant.slug} · {compte(enfant.slug)} fiche
-                                {compte(enfant.slug) > 1 ? "s" : ""}
-                              </span>
-                            </span>
-                            <span className="flex shrink-0 items-center gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  setEdite({ rayon: enfant, genre: "sous-categorie" })
-                                }
-                              >
-                                Modifier
-                              </Button>
-                              <DeleteButton
-                                onConfirm={() => deleteCategory(enfant.id)}
-                                empeche={empeche(enfant)}
-                                label=""
-                              />
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </Section>
-            );
-          })}
-        </div>
+          {categoriesAffichees.length === 0 && (
+            <p className="rounded-2xl border border-line bg-white px-5 py-10 text-center text-[13px] text-muted">Aucun résultat</p>
+          )}
+          <Pagination
+            page={pageCategories}
+            pages={pagesCategories}
+            total={totalCategories}
+            debut={debutCategories}
+            affiches={categoriesPage.length}
+            onPage={setPageCategories}
+            unite={filtreType === "categories" ? "catégories" : "sous-catégories"}
+          />
+        </>
       )}
 
       <p className="mt-4 text-[12.5px] text-muted">
@@ -281,6 +465,54 @@ export default function Page() {
           }}
         />
       )}
+
+      <Modal
+        open={Boolean(suppression)}
+        onClose={() => setSuppression(null)}
+        title={`Supprimer « ${suppression?.label ?? ""} » ?`}
+      >
+        <div className="flex flex-col gap-4">
+          {categories.some((c) => c.id !== suppression?.id) && (
+            <select
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className="w-full rounded-xl border-[1.5px] border-[#ece3e7] bg-white px-3.5 py-2.5 text-[13.5px] outline-none focus:border-rose"
+            >
+              {categories
+                .filter((c) => c.id !== suppression?.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+            </select>
+          )}
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <Button variant="ghost" onClick={() => setSuppression(null)}>Annuler</Button>
+            {destination && (
+              <Button
+                variant="contour"
+                onClick={() => {
+                  if (!suppression) return;
+                  deleteCategory(suppression.id, { mode: "deplacer", destinationId: destination });
+                  setSuppression(null);
+                }}
+              >
+                Déplacer les brouillons
+              </Button>
+            )}
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (!suppression) return;
+                deleteCategory(suppression.id, { mode: "supprimer" });
+                setSuppression(null);
+              }}
+            >
+              <IconTrash />
+              Supprimer les brouillons
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -353,19 +585,13 @@ function ChoixSousCategories({
   return (
     <Modal open onClose={onClose} title={`Sous-catégories de « ${categorie.label} »`}>
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] leading-relaxed text-muted">
-          Cochez celles qui appartiennent à cette catégorie. Une même sous-catégorie peut se ranger
-          dans plusieurs — des tee-shirts vont aussi bien chez les filles que chez les garçons.
-        </p>
-
         {proposables.length > 6 && (
           <SearchField value={recherche} onChange={setRecherche} placeholder="Chercher…" />
         )}
 
         {proposables.length === 0 ? (
-          <p className="rounded-2xl bg-mist px-4 py-3.5 text-[12.5px] leading-relaxed text-muted">
-            Aucune sous-catégorie n&apos;existe encore. Créez-en une, elle sera ensuite proposée
-            ici pour toutes les autres catégories.
+          <p className="rounded-2xl bg-mist px-4 py-3.5 text-[12.5px] text-muted">
+            Aucune sous-catégorie.
           </p>
         ) : (
           <ul className="flex max-h-[46vh] flex-col divide-y divide-[#f4edf0] overflow-auto">
@@ -390,7 +616,7 @@ function ChoixSousCategories({
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13.5px] font-bold">{r.label}</span>
                       <span className="mt-0.5 block text-[11.5px] text-muted">
-                        /{r.slug} · {compte(r.slug)} fiche{compte(r.slug) > 1 ? "s" : ""}
+                        {compte(r.slug)} produit{compte(r.slug) > 1 ? "s" : ""}
                         {ailleurs.length > 0 && ` · aussi dans ${ailleurs.join(", ")}`}
                       </span>
                     </span>
@@ -440,9 +666,11 @@ function EditeurRayon({
   onClose: () => void;
   onSave: (c: AdminCategory) => void;
 }) {
-  const { televerserMedia } = useAdmin();
+  const { library, televerserMedia } = useAdmin();
   const [brouillon, setBrouillon] = useState<AdminCategory>(rayon);
   const [envoiImage, setEnvoiImage] = useState(false);
+  const [phototheque, setPhototheque] = useState(false);
+  const [rechercheParente, setRechercheParente] = useState("");
   const fichierRef = useRef<HTMLInputElement>(null);
 
   const maj = (patch: Partial<AdminCategory>) => setBrouillon({ ...brouillon, ...patch });
@@ -452,6 +680,9 @@ function EditeurRayon({
 
   const parentesPossibles = rayons.filter(
     (r) => r.parentSlugs.length === 0 && r.slug && r.slug !== brouillon.slug,
+  );
+  const parentesVisibles = parentesPossibles.filter((r) =>
+    r.label.toLocaleLowerCase("fr").includes(rechercheParente.trim().toLocaleLowerCase("fr")),
   );
 
   const valide =
@@ -485,10 +716,7 @@ function EditeurRayon({
   return (
     <Modal open onClose={onClose} title={titre}>
       <div className="flex flex-col gap-4">
-        <Field
-          label="Libellé"
-          hint={brouillon.label ? `Adresse : /boutique?cat=${slugify(brouillon.label)}` : undefined}
-        >
+        <Field label="Libellé">
           <Input
             value={brouillon.label}
             onChange={(v) => maj({ label: v, slug: slugify(v) })}
@@ -499,44 +727,65 @@ function EditeurRayon({
         {/* Le seul endroit où la question du rattachement se pose. Une
             catégorie n'a pas de parente : son formulaire n'en parle pas. */}
         {sousCategorie && (
-          <div>
-            <span className="mb-2 block text-[12px] font-bold">
-              Ranger dans{" "}
-              <span className="font-medium text-muted">
-                — plusieurs choix possibles
-              </span>
-            </span>
+          <div className="rounded-2xl border border-line bg-mist/50 p-3.5">
+            <span className="mb-2 block text-[12px] font-bold">Catégories parentes</span>
             {parentesPossibles.length === 0 ? (
-              <p className="rounded-2xl bg-mist px-4 py-3 text-[12.5px] leading-relaxed text-muted">
-                Aucune catégorie où la ranger. Créez-en une d&apos;abord.
+              <p className="rounded-2xl bg-mist px-4 py-3 text-[12.5px] text-muted">
+                Aucune catégorie disponible.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {parentesPossibles.map((r) => {
-                  const on = brouillon.parentSlugs.includes(r.slug);
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => basculer(r.slug)}
-                      className={`rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
-                        on ? "bg-ink text-white" : "border border-line bg-white text-muted"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col gap-2.5">
+                {brouillon.parentSlugs.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {parentesPossibles
+                      .filter((r) => brouillon.parentSlugs.includes(r.slug))
+                      .map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => basculer(r.slug)}
+                          className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white"
+                          title={`Retirer ${r.label}`}
+                        >
+                          {r.label}
+                          <span aria-hidden="true">×</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+                <SearchField
+                  value={rechercheParente}
+                  onChange={setRechercheParente}
+                  placeholder="Rechercher une catégorie"
+                />
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-line bg-white p-1.5">
+                  {parentesVisibles.map((r) => {
+                    const on = brouillon.parentSlugs.includes(r.slug);
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => basculer(r.slug)}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-mist"
+                      >
+                        <span
+                          className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${
+                            on ? "border-rose bg-rose text-white" : "border-[#e5d9de] bg-white"
+                          }`}
+                        >
+                          {on && <IconCheck className="h-3 w-3" />}
+                        </span>
+                        <span className="truncate text-[12.5px] font-semibold">{r.label}</span>
+                      </button>
+                    );
+                  })}
+                  {parentesVisibles.length === 0 && (
+                    <p className="px-2.5 py-3 text-center text-[12px] text-muted">Aucun résultat</p>
+                  )}
+                </div>
               </div>
             )}
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted">
-              {brouillon.parentSlugs.length === 0
-                ? "Choisissez-en au moins une."
-                : brouillon.parentSlugs.length === 1
-                  ? "Elle apparaîtra dans cette catégorie."
-                  : `Elle apparaîtra dans ces ${brouillon.parentSlugs.length} catégories.`}
-            </p>
           </div>
         )}
 
@@ -554,9 +803,10 @@ function EditeurRayon({
           <span className="mb-2 block text-[12px] font-bold">Visuel</span>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span
-              className="h-20 w-16 shrink-0 rounded-xl bg-stone bg-cover bg-center"
-              style={brouillon.image ? { backgroundImage: `url(${brouillon.image})` } : undefined}
+            <VisuelCategorie
+              src={brouillon.image}
+              alt={brouillon.label || "Aperçu"}
+              className="h-20 w-16 rounded-xl"
             />
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -574,6 +824,10 @@ function EditeurRayon({
               >
                 {envoiImage ? "Envoi…" : brouillon.image ? "Changer l'image" : "Importer une image"}
               </Button>
+              <Button variant="contour" size="sm" onClick={() => setPhototheque(true)}>
+                <IconImage />
+                Photothèque
+              </Button>
               {brouillon.image && (
                 <Button variant="ghost" size="sm" onClick={() => maj({ image: "" })}>
                   <IconTrash />
@@ -589,16 +843,13 @@ function EditeurRayon({
             onChange={(v) => maj({ image: v })}
             placeholder="…ou collez l'adresse d'une image déjà en ligne"
           />
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted">
-            L&apos;image envoyée rejoint la photothèque et reste disponible pour les fiches.
-          </p>
         </div>
 
         <Toggle
           checked={brouillon.active}
           onChange={(v) => maj({ active: v })}
           label="Visible en boutique"
-          hint="Masqué, le rayon sort de la navigation ; ses fiches restent publiées."
+          hint="Masqué, le rayon sort de la navigation ; ses produits restent publiés."
         />
 
         <div className="flex items-center justify-end gap-2.5 border-t border-line pt-4">
@@ -609,6 +860,30 @@ function EditeurRayon({
             Enregistrer
           </Button>
         </div>
+
+        <Modal open={phototheque} onClose={() => setPhototheque(false)} title="Photothèque">
+          {library.media.length === 0 ? (
+            <p className="text-[13px] text-muted">Photothèque vide.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+              {library.media.map((media) => (
+                <button
+                  key={media.id}
+                  type="button"
+                  onClick={() => {
+                    maj({ image: media.src });
+                    setPhototheque(false);
+                  }}
+                  title={media.name}
+                  className={`aspect-3/4 rounded-xl bg-stone bg-cover bg-center ring-offset-2 transition-all hover:ring-2 hover:ring-rose ${
+                    brouillon.image === media.src ? "ring-2 ring-ink" : ""
+                  }`}
+                  style={{ backgroundImage: `url(${media.src})` }}
+                />
+              ))}
+            </div>
+          )}
+        </Modal>
       </div>
     </Modal>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CATEGORIES, LOGO, PRODUCTS, byId, countByAge } from "@/lib/products";
+import { CATEGORIES, LOGO, PRODUCTS, byId } from "@/lib/products";
 import { formatXOF } from "@/lib/format";
 import { ScrollProgress } from "./motion";
 import { useAuth } from "./auth-context";
@@ -29,8 +29,8 @@ import {
    défilement — elle sert aussi de trait de séparation. */
 
 const NAV = [
-  { href: "/boutique?g=fille", label: "Filles" },
-  { href: "/boutique?g=garcon", label: "Garçons" },
+  { href: "/boutique?cat=Ensembles", label: "Ensembles" },
+  { href: "/boutique?cat=Robes%20%26%20jupes", label: "Robes & jupes" },
   { href: "/boutique?cat=Chaussures", label: "Chaussures" },
   { href: "/coin-maman", label: "Coin Maman" },
   { href: "/avis", label: "Avis" },
@@ -44,11 +44,6 @@ const COMPTE = [
   { href: "/favoris", label: "Mes favoris", Icone: IconHeart },
   { href: "/commandes", label: "Mes commandes", Icone: IconPackage },
   { href: "/compte/connexion", label: "Se connecter", Icone: IconUser },
-];
-
-const AGES = [
-  { key: "2-10" as const, label: "Enfant", hint: "2 à 10 ans" },
-  { key: "11-14" as const, label: "Grand", hint: "11 à 14 ans" },
 ];
 
 /** La pièce mise en avant dans le menu déroulant. */
@@ -190,24 +185,15 @@ export function Header() {
 
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-[.14em] text-muted">
-                          Par âge
+                          Les univers
                         </div>
                         <div className="mt-3 flex flex-col gap-1">
-                          {AGES.map((a) => (
-                            <Link
-                              key={a.key}
-                              href={`/boutique?age=${a.key}`}
-                              className="flex items-center justify-between rounded-xl px-3 py-2 transition-colors hover:bg-stone"
-                            >
-                              <span>
-                                <span className="block text-[13.5px] font-semibold">{a.label}</span>
-                                <span className="block text-[12px] text-muted">{a.hint}</span>
-                              </span>
-                              <span className="rounded-full bg-rose/10 px-2 py-0.5 text-[11.5px] font-bold text-rose">
-                                {countByAge(a.key)}
-                              </span>
-                            </Link>
-                          ))}
+                          <Link href="/boutique" className="rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors hover:bg-stone">
+                            Enfants
+                          </Link>
+                          <Link href="/coin-maman" className="rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors hover:bg-stone">
+                            Coin Maman
+                          </Link>
                         </div>
                         <Link
                           href="/boutique"

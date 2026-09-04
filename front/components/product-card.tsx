@@ -97,13 +97,22 @@ export function ProductCard({
 
       <Link href={`/p/${product.slug}`} className="block pt-3.5">
         <div className="text-[11px] font-bold uppercase tracking-[.1em] text-muted">
-          {product.category} · {product.age} ans
+          {product.category}
         </div>
         <div className="mt-1 text-[14.5px] font-semibold leading-snug tracking-tight transition-colors group-hover:text-rose">
           {product.name}
         </div>
+        {/* En promotion, le prix du jour passe en rose et l'ancien s'efface :
+            deux prix de même poids se lisent mal, et c'est le nouveau qu'on
+            veut voir en premier. */}
         <div className="mt-1.5 flex items-baseline gap-2.5">
-          <span className="text-[15px] font-extrabold tabular-nums">{formatXOF(product.price)}</span>
+          <span
+            className={`text-[15px] font-extrabold tabular-nums ${
+              product.compareAt ? "text-rose" : ""
+            }`}
+          >
+            {formatXOF(product.price)}
+          </span>
           {product.compareAt && (
             <span className="text-[13px] text-muted line-through">{formatXOF(product.compareAt)}</span>
           )}

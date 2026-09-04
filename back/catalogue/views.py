@@ -80,6 +80,7 @@ class CatalogueViewSet(viewsets.ReadOnlyModelViewSet):
             .prefetch_related(
                 Prefetch("photos", queryset=PhotoProduit.objects.select_related("media").order_by("position")),
                 Prefetch("variantes", queryset=Variante.objects.select_related("taille", "coloris")),
+                "matieres",
             )
         )
 
@@ -93,7 +94,7 @@ class CatalogueViewSet(viewsets.ReadOnlyModelViewSet):
         # par son adresse quel que soit son univers, sinon un lien vers un
         # coupon de bazin renverrait « page introuvable ».
         if self.action == "list":
-            selection = selection.filter(univers=params.get("univers", "enfant"))
+            selection = selection.filter(rayon__univers=params.get("univers", "enfant"))
 
         # Choisir « Coin Maman » doit ramener ses tissus et ses voiles : on
         # filtre sur le rayon **et** ses sous-catégories. Le `distinct` compte :
@@ -103,10 +104,6 @@ class CatalogueViewSet(viewsets.ReadOnlyModelViewSet):
             selection = selection.filter(
                 Q(rayon__slug=rayon) | Q(rayon__parents__slug=rayon)
             ).distinct()
-        if genre := params.get("genre"):
-            selection = selection.filter(Q(genre=genre) | Q(genre=Produit.Genre.MIXTE))
-        if age := params.get("age"):
-            selection = selection.filter(age=age)
         if taille := params.get("taille"):
             selection = selection.filter(variantes__taille__valeur=taille).distinct()
 
@@ -215,7 +212,7 @@ class ProduitGestionViewSet(viewsets.ModelViewSet):
     serializer_class = ProduitAdminSerializer
     queryset = (
         Produit.objects.select_related("rayon")
-        .prefetch_related("photos__media", "variantes__taille", "variantes__coloris")
+        .prefetch_related("photos__media", "variantes__taille", "variantes__coloris", "matieres")
     )
 
     def get_queryset(self):
@@ -282,10 +279,11 @@ class ProduitGestionViewSet(viewsets.ModelViewSet):
             slug=f"{source.slug}-copie-{suffixe}",
             sku=f"{source.sku}-C{suffixe}",
             prix=source.prix, prix_barre=source.prix_barre,
-            description=source.description, matiere=source.matiere,
-            rayon=source.rayon, genre=source.genre, age=source.age,
+            description=source.description,
+            rayon=source.rayon,
             statut=Produit.Statut.BROUILLON,
         )
+        copie.matieres.set(source.matieres.all())
         for photo in source.photos.all():
             PhotoProduit.objects.create(produit=copie, media=photo.media, position=photo.position)
         for variante in source.variantes.all():
@@ -374,20 +372,44 @@ class RayonGestionViewSet(viewsets.ModelViewSet):
     serializer_class = RayonSerializer
     queryset = Rayon.objects.select_related("image").prefetch_related("parents", "enfants")
 
-    def perform_destroy(self, instance):
-        """
-        Un rayon ne se supprime ni s'il porte des produits — ils deviendraient
-        orphelins — ni s'il porte des sous-catégories.
-        """
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        """Supprime un rayon vide ou traite explicitement ses seuls brouillons."""
         from rest_framework.exceptions import ValidationError
 
-        if instance.produits.exists():
-            raise ValidationError({"detail": "Retirez d'abord les produits de ce rayon."})
+        instance = self.get_object()
         if instance.enfants.exists():
             raise ValidationError(
                 {"detail": "Cette catégorie contient des sous-catégories. Retirez-les d'abord."}
             )
+        if instance.produits.filter(statut=Produit.Statut.PUBLIE).exists():
+            raise ValidationError(
+                {"detail": "Une catégorie contenant un produit publié ne peut pas être supprimée."}
+            )
+
+        brouillons = instance.produits.filter(statut=Produit.Statut.BROUILLON)
+        mode = request.query_params.get("brouillons")
+        if brouillons.exists():
+            if mode == "supprimer":
+                brouillons.delete()
+            elif mode == "deplacer":
+                destination_id = request.query_params.get("destination")
+                try:
+                    destination = Rayon.objects.exclude(pk=instance.pk).get(pk=destination_id)
+                except (Rayon.DoesNotExist, ValueError, TypeError):
+                    raise ValidationError({"detail": "Choisissez une catégorie de destination."})
+                brouillons.update(rayon=destination)
+            else:
+                raise ValidationError(
+                    {"detail": "Choisissez de déplacer ou de supprimer les produits en brouillon."}
+                )
+
+        # Les anciennes fiches archivées restent une trace et ne sont jamais
+        # supprimées implicitement.
+        if instance.produits.exists():
+            raise ValidationError({"detail": "Cette catégorie contient encore des produits."})
         instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TailleViewSet(viewsets.ModelViewSet):
@@ -409,6 +431,12 @@ class MatiereViewSet(viewsets.ModelViewSet):
     serializer_class = MatiereSerializer
     queryset = Matiere.objects.all()
     pagination_class = None
+
+    def perform_destroy(self, instance):
+        if instance.produits.exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"detail": "Cette matière est utilisée par une ou plusieurs fiches."})
+        instance.delete()
 
 
 class MediaViewSet(viewsets.ModelViewSet):

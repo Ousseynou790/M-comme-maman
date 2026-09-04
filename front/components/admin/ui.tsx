@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { STATUS_LABELS, STATUS_TONES } from "@/lib/admin/store";
 import type { OrderStatus, ProductStatus } from "@/lib/admin/types";
 import {
   IconArrowLeft,
   IconArrowRight,
-  IconCheck,
   IconSearchAdmin,
   IconTrash,
   IconX,
@@ -48,7 +48,6 @@ export function PageHeader({
           </span>
         )}
         <h1 className="text-[clamp(1.6rem,3vw,1.9rem)] font-extrabold tracking-[-.03em]">{title}</h1>
-        {sub && <p className="mt-1.5 max-w-[70ch] text-[13.5px] leading-relaxed text-muted">{sub}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -74,7 +73,6 @@ export function Section({
         <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             {title && <h2 className="text-[15px] font-extrabold tracking-tight">{title}</h2>}
-            {sub && <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{sub}</p>}
           </div>
           {action}
         </header>
@@ -392,7 +390,6 @@ export function Field({
     <label className={`block ${className}`}>
       <span className="mb-1.5 block text-[12px] font-bold">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-[11.5px] leading-relaxed text-muted">{hint}</span>}
     </label>
   );
 }
@@ -488,10 +485,7 @@ export function Toggle({
           }`}
         />
       </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] font-bold">{label}</span>
-        {hint && <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">{hint}</span>}
-      </span>
+      <span className="min-w-0 text-[13px] font-bold">{label}</span>
     </label>
   );
 }
@@ -612,9 +606,9 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       className="fixed inset-0 z-90 flex items-start justify-center overflow-y-auto bg-ink/45 p-4 backdrop-blur-[3px] sm:p-8"
@@ -624,7 +618,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`anim-fade-up my-auto w-full rounded-[22px] bg-white p-5 sm:p-6 ${
+        className={`anim-fade-up my-auto max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[22px] bg-white p-5 sm:max-h-[calc(100dvh-4rem)] sm:p-6 ${
           wide ? "max-w-[860px]" : "max-w-[560px]"
         }`}
       >
@@ -641,11 +635,12 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
-/** Suppression en deux temps : le premier clic demande, le second exécute. */
+/** Toute suppression se confirme dans une fenêtre modale. */
 export function DeleteButton({
   onConfirm,
   label = "Supprimer",
@@ -659,12 +654,6 @@ export function DeleteButton({
 }) {
   const [demande, setDemande] = useState(false);
 
-  useEffect(() => {
-    if (!demande) return;
-    const t = window.setTimeout(() => setDemande(false), 4000);
-    return () => window.clearTimeout(t);
-  }, [demande]);
-
   if (empeche) {
     return (
       <Button variant="ghost" size="sm" disabled title={empeche}>
@@ -674,35 +663,37 @@ export function DeleteButton({
     );
   }
 
-  if (demande) {
-    return (
+  return (
+    <>
       <Button
-        variant="danger"
+        variant="ghost"
         size="sm"
         onClick={(e) => {
           e.stopPropagation();
-          onConfirm();
-          setDemande(false);
+          setDemande(true);
         }}
       >
-        <IconCheck />
-        Confirmer
+        <IconTrash />
+        {label}
       </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={(e) => {
-        e.stopPropagation();
-        setDemande(true);
-      }}
-    >
-      <IconTrash />
-      {label}
-    </Button>
+      <Modal open={demande} onClose={() => setDemande(false)} title="Confirmer la suppression">
+        <div className="flex justify-end gap-2.5">
+          <Button variant="ghost" onClick={() => setDemande(false)}>
+            Annuler
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              onConfirm();
+              setDemande(false);
+            }}
+          >
+            <IconTrash />
+            Supprimer
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -722,7 +713,6 @@ export function EmptyState({
   return (
     <div className={`${CARTE} px-6 py-14 text-center`}>
       <p className="text-[15px] font-extrabold tracking-tight">{title}</p>
-      {hint && <p className="mx-auto mt-2 max-w-[46ch] text-[13px] leading-relaxed text-muted">{hint}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );
@@ -822,7 +812,6 @@ export function SideDrawer({
         <header className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
           <div className="min-w-0">
             <h2 className="text-[16px] font-extrabold tracking-tight">{title}</h2>
-            {subtitle && <p className="mt-1 text-[12px] text-muted">{subtitle}</p>}
           </div>
           <button
             type="button"
@@ -882,7 +871,6 @@ export function OptionPills<T extends string>({
           </button>
         ))}
       </div>
-      {hint && <p className="mt-2 text-[11.5px] leading-relaxed text-muted">{hint}</p>}
     </div>
   );
 }

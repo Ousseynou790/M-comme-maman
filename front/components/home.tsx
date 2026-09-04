@@ -32,7 +32,7 @@ import { useReviews } from "./reviews-context";
 import { StarRow } from "./review-form";
 import { Countdown } from "./countdown";
 import { INSTAGRAM, INSTAGRAM_URL, waLink } from "@/lib/format";
-import { HERO_VIGNETTES, PRODUCTS, PROMO_END, type Product } from "@/lib/products";
+import { HERO_VIGNETTES, PROMO_END, type Product } from "@/lib/products";
 
 const REASSURANCE = [
   { t: "Livraison 24 h", s: "Dakar et banlieue, appel avant passage" },
@@ -100,12 +100,6 @@ const TUILES_UNIVERS = [
     href: "/boutique",
     className: "",
   },
-];
-
-const TABS = [
-  { key: "tous", label: "Tous" },
-  { key: "fille", label: "Fille" },
-  { key: "garcon", label: "Garçon" },
 ];
 
 /* Les trois visuels du Coin Maman. Ils pointent vers leur sous-catégorie
@@ -214,7 +208,7 @@ const SHELL = "mx-auto w-full max-w-[1400px] px-5 md:px-8 lg:px-10";
 const H2 = "text-[clamp(1.95rem,3.8vw,2.6rem)] font-extrabold tracking-[-.032em]";
 const EYEBROW = "text-[11px] font-bold uppercase tracking-[.16em] text-rose";
 
-export function Home() {
+export function Home({ products }: { products: Product[] }) {
   const [tab, setTab] = useState("tous");
   const [quick, setQuick] = useState<Product | null>(null);
 
@@ -250,9 +244,13 @@ export function Home() {
     return () => window.removeEventListener("resize", place);
   }, [tab]);
 
-  const shown = PRODUCTS.filter((p) =>
-    tab === "tous" ? true : p.gender === tab || p.gender === "mixte"
-  );
+  const tabs = [
+    { key: "tous", label: "Tous" },
+    ...[...new Set(products.map((p) => p.category))]
+      .slice(0, 3)
+      .map((category) => ({ key: category, label: category })),
+  ];
+  const shown = products.filter((p) => tab === "tous" || p.category === tab);
 
   return (
     <>
@@ -353,7 +351,7 @@ export function Home() {
               className="absolute bottom-1.5 left-0 top-1.5 rounded-full bg-ink transition-[transform,width] duration-450 ease-back"
               style={{ transform: `translateX(${pill.left}px)`, width: pill.width, opacity: pill.width ? 1 : 0 }}
             />
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.key}
                 ref={(el) => {

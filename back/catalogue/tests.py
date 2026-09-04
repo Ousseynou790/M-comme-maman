@@ -11,7 +11,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Coloris, Media, MouvementStock, PhotoProduit, Produit, Rayon, Taille, Variante
+from .models import Coloris, Matiere, Media, MouvementStock, PhotoProduit, Produit, Rayon, Taille, Variante
 from .recherche import mots, normaliser
 
 Utilisateur = get_user_model()
@@ -44,6 +44,53 @@ class RechercheTest(TestCase):
     def test_les_synonymes_sont_traduits(self):
         self.assertIn("chaussures", mots("baskets"))
         self.assertIn("0-1", mots("bébé"))
+
+
+class ReferentielsUniquesTest(APITestCase):
+    def setUp(self):
+        gerante = Utilisateur.objects.create_user(
+            email="referentiels@test.sn",
+            nom="Gérante",
+            password="motdepasse123",
+            role=Utilisateur.Role.GERANTE,
+        )
+        self.client.force_authenticate(gerante)
+
+    def test_une_taille_ne_se_duplique_pas_avec_une_autre_casse(self):
+        Taille.objects.create(valeur="L")
+        reponse = self.client.post(
+            reverse("taille-list"),
+            {"valeur": " l ", "repere": "", "ordre": 1},
+            format="json",
+        )
+        self.assertEqual(reponse.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_un_coloris_ne_se_duplique_pas_avec_une_autre_casse(self):
+        Coloris.objects.create(nom="Rose poudré", hexa="#e8b7c8")
+        reponse = self.client.post(
+            reverse("coloris-list"),
+            {"nom": " rose   POUDRÉ ", "hexa": "#abcdef"},
+            format="json",
+        )
+        self.assertEqual(reponse.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_une_teinte_ne_peut_pas_porter_deux_noms(self):
+        Coloris.objects.create(nom="Rose", hexa="#e0417f")
+        reponse = self.client.post(
+            reverse("coloris-list"),
+            {"nom": "Framboise", "hexa": "#E0417F"},
+            format="json",
+        )
+        self.assertEqual(reponse.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_une_matiere_ne_se_duplique_pas_avec_une_autre_casse(self):
+        Matiere.objects.create(nom="Coton biologique")
+        reponse = self.client.post(
+            reverse("matiere-list"),
+            {"nom": "  coton BIOLOGIQUE  "},
+            format="json",
+        )
+        self.assertEqual(reponse.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class CataloguePublicTest(APITestCase):
@@ -206,3 +253,30 @@ class PhotothequeTest(APITestCase):
         produit = fabriquer_produit()
         reponse = self.client.delete(reverse("rayon-gestion-detail", args=[produit.rayon.pk]))
         self.assertEqual(reponse.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_un_brouillon_peut_etre_supprime_avec_son_rayon(self):
+        produit = fabriquer_produit(
+            slug="brouillon-supprime", sku="BRO-SUP", statut=Produit.Statut.BROUILLON,
+        )
+        rayon_id = produit.rayon_id
+        url = reverse("rayon-gestion-detail", args=[rayon_id]) + "?brouillons=supprimer"
+        reponse = self.client.delete(url)
+        self.assertEqual(reponse.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Produit.objects.filter(pk=produit.pk).exists())
+        self.assertFalse(Rayon.objects.filter(pk=rayon_id).exists())
+
+    def test_un_brouillon_peut_etre_deplace_avant_la_suppression_du_rayon(self):
+        produit = fabriquer_produit(
+            slug="brouillon-deplace", sku="BRO-DEP", statut=Produit.Statut.BROUILLON,
+        )
+        ancien_rayon = produit.rayon
+        destination = Rayon.objects.create(nom="Destination", slug="destination")
+        url = (
+            reverse("rayon-gestion-detail", args=[ancien_rayon.pk])
+            + f"?brouillons=deplacer&destination={destination.pk}"
+        )
+        reponse = self.client.delete(url)
+        self.assertEqual(reponse.status_code, status.HTTP_204_NO_CONTENT)
+        produit.refresh_from_db()
+        self.assertEqual(produit.rayon, destination)
+        self.assertFalse(Rayon.objects.filter(pk=ancien_rayon.pk).exists())

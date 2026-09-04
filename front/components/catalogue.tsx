@@ -5,19 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { ProductCard } from "./product-card";
 import { QuickView } from "./quick-view";
 import { PRODUCTS, CATEGORIES, type Product } from "@/lib/products";
-import { chercherProduits } from "@/lib/search";
 
 const SORTS = ["Nouveautés", "Prix croissant", "Prix décroissant", "A → Z"] as const;
-
-const AGE_FACETS = [
-  { key: "2-10", label: "2 à 10 ans" },
-  { key: "11-14", label: "11 à 14 ans" },
-];
-
-const GENDER_FACETS = [
-  { key: "fille", label: "Fille" },
-  { key: "garcon", label: "Garçon" },
-];
 
 export function Catalogue({
   produits = PRODUCTS,
@@ -32,14 +21,17 @@ export function Catalogue({
   const initial = useMemo(() => {
     const f: string[] = [];
     if (params.get("cat")) f.push("cat:" + params.get("cat"));
-    if (params.get("age")) f.push("age:" + params.get("age"));
-    if (params.get("g")) f.push("g:" + params.get("g"));
     return f;
   }, [params]);
 
   const [filters, setFilters] = useState<string[]>(initial);
   const [sort, setSort] = useState(0);
   const [quick, setQuick] = useState<Product | null>(null);
+  const prixCatalogue = produits.map((p) => p.price);
+  const prixMini = prixCatalogue.length ? Math.min(...prixCatalogue) : 0;
+  const prixMaxi = prixCatalogue.length ? Math.max(...prixCatalogue) : 0;
+  const [prixMin, setPrixMin] = useState(prixMini);
+  const [prixMax, setPrixMax] = useState(prixMaxi);
 
   /* La recherche du bandeau arrive par « ?q= ». On la recopie en état pour
      pouvoir la retirer d'un clic, comme un filtre. */
@@ -55,30 +47,34 @@ export function Catalogue({
 
   const matches = (p: Product, f: string) => {
     const [kind, value] = f.split(":");
-    if (kind === "age") return p.age === value;
-    if (kind === "g") return p.gender === value || p.gender === "mixte";
     return p.category === value;
   };
 
-  /* Cherchée, la liste arrive déjà classée par pertinence ; les facettes ne
-     font ensuite que retrancher, elles ne rebattent pas l'ordre. */
   const base = useMemo(
-    () => (recherche ? chercherProduits(recherche, 100).map((r) => r.product) : produits),
-    [recherche]
+    () => {
+      const q = recherche.toLocaleLowerCase("fr").trim();
+      if (!q) return produits;
+      return produits.filter((p) =>
+        [p.name, p.category, p.description].some((valeur) =>
+          valeur.toLocaleLowerCase("fr").includes(q),
+        ),
+      );
+    },
+    [produits, recherche],
   );
 
   const list = useMemo(() => {
-    const out = base.filter((p) => filters.every((f) => matches(p, f)));
+    const out = base.filter(
+      (p) => filters.every((f) => matches(p, f)) && p.price >= prixMin && p.price <= prixMax,
+    );
     if (sort === 1) return [...out].sort((a, b) => a.price - b.price);
     if (sort === 2) return [...out].sort((a, b) => b.price - a.price);
     if (sort === 3) return [...out].sort((a, b) => a.name.localeCompare(b.name, "fr"));
     return out;
-  }, [base, filters, sort]);
+  }, [base, filters, prixMax, prixMin, sort]);
 
   const chipLabel = (f: string) => {
     const [kind, value] = f.split(":");
-    if (kind === "age") return value + " ans";
-    if (kind === "g") return value === "fille" ? "Fille" : "Garçon";
     return value;
   };
 
@@ -152,23 +148,19 @@ export function Catalogue({
                   : null,
               )
             : facet("Catégorie", CATEGORIES.map((c) => ({ key: "cat:" + c, label: c })))}
-          {facet("Âge", AGE_FACETS.map((a) => ({ key: "age:" + a.key, label: a.label })))}
-          {facet("Genre", GENDER_FACETS.map((g) => ({ key: "g:" + g.key, label: g.label })))}
-
           <div>
             <div className="border-b border-line pb-3 text-[12.5px] font-extrabold uppercase tracking-[.06em]">
               Prix
             </div>
-            <div className="pt-6">
-              <div className="relative h-1 rounded-full bg-line">
-                <div className="absolute inset-y-0 left-0 right-[22%] rounded-full bg-rose" />
-                <div className="absolute -top-1.5 left-0 h-4 w-4 rounded-full border-2 border-rose bg-white shadow" />
-                <div className="absolute -top-1.5 left-[calc(78%-8px)] h-4 w-4 rounded-full border-2 border-rose bg-white shadow" />
-              </div>
-              <div className="mt-4 flex justify-between text-[13px] tabular-nums text-muted">
-                <span>3 000 F</span>
-                <span>14 000 F</span>
-              </div>
+            <div className="grid grid-cols-2 gap-2 pt-4">
+              <label className="text-[11.5px] font-semibold text-muted">
+                Minimum
+                <input type="number" min={prixMini} max={prixMax} value={prixMin} onChange={(e) => setPrixMin(Math.min(Number(e.target.value) || 0, prixMax))} className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-[13px] text-ink" />
+              </label>
+              <label className="text-[11.5px] font-semibold text-muted">
+                Maximum
+                <input type="number" min={prixMin} max={prixMaxi} value={prixMax} onChange={(e) => setPrixMax(Math.max(Number(e.target.value) || 0, prixMin))} className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-[13px] text-ink" />
+              </label>
             </div>
           </div>
         </aside>

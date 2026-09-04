@@ -20,6 +20,7 @@ import {
   versColoris,
   versCommande,
   versMedia,
+  versMatiere,
   versProduit,
   versPromotion,
   versReglages,
@@ -29,6 +30,7 @@ import {
   type ColorisApi,
   type CommandeApi,
   type MediaApi,
+  type MatiereApi,
   type PhotoProduitApi,
   type ProduitGestionApi,
   type ReglagesApi,
@@ -117,6 +119,9 @@ interface AdminContextValue extends AdminState {
   enCours: boolean;
   /** Le dernier refus du serveur, en clair. */
   erreur: string;
+  notification: { type: "success" | "error" | "warning"; message: string } | null;
+  dismissNotification: () => void;
+  notify: (type: "success" | "error" | "warning", message: string) => void;
   /* Produits */
   saveProduct: (product: AdminProduct) => void;
   createProduct: (product: AdminProduct) => void;
@@ -128,16 +133,19 @@ interface AdminContextValue extends AdminState {
   setOrderStatus: (id: string, status: OrderStatus) => void;
   /* Rayons */
   saveCategory: (category: AdminCategory) => void;
-  deleteCategory: (id: string) => void;
+  deleteCategory: (
+    id: string,
+    brouillons?: { mode: "supprimer" } | { mode: "deplacer"; destinationId: string },
+  ) => void;
   /* Promotions */
   savePromotion: (promotion: AdminPromotion) => void;
   deletePromotion: (id: string) => void;
   /* Bibliothèque */
   saveSizes: (sizes: SizeValue[]) => void;
-  setSizeGuide: (src: string) => void;
   saveColor: (color: AdminColor) => void;
   deleteColor: (id: string) => void;
-  setMaterials: (materials: string[]) => void;
+  saveMaterial: (name: string) => void;
+  deleteMaterial: (id: string) => void;
   addMedia: (items: Pick<MediaItem, "src" | "name">[]) => void;
   /** Envoie un fichier à la photothèque et renvoie l'image créée. */
   televerserMedia: (fichier: File, nom?: string) => Promise<MediaItem | null>;
@@ -189,6 +197,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [notification, setNotification] = useState<AdminContextValue["notification"]>(null);
+
+  useEffect(() => {
+    if (!notification) return;
+    const minuteur = window.setTimeout(() => setNotification(null), 4200);
+    return () => window.clearTimeout(minuteur);
+  }, [notification]);
 
   /**
    * Relit tout.
@@ -198,7 +213,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
    * latérale ont besoin des commandes même sur la page des rayons.
    */
   const relire = useCallback(async () => {
-    const [produits, rayons, commandes, clientes, campagnes, tailles, coloris, medias, reglages] =
+    const [produits, rayons, commandes, clientes, campagnes, tailles, coloris, matieres, medias, reglages] =
       await Promise.all([
         tout<ProduitGestionApi>("/api/gestion/produits/"),
         envoyer<RayonApi[]>("/api/catalogue/rayons/?tous=1").catch(() => null),
@@ -207,6 +222,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         tout<CampagneApi>("/api/gestion/campagnes/"),
         envoyer<TailleApi[]>("/api/gestion/tailles/").catch(() => null),
         envoyer<ColorisApi[]>("/api/gestion/coloris/").catch(() => null),
+        envoyer<MatiereApi[]>("/api/gestion/matieres/").catch(() => null),
         tout<MediaApi>("/api/gestion/photheque/"),
         // Les réglages du back-office passent par `/api/gestion/` : la route
         // publique est en lecture seule et ne porte pas le seuil de stock bas.
@@ -214,17 +230,20 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         envoyer<ReglagesApi>("/api/gestion/reglages/").catch(() => null),
       ]);
 
+    const categories = (rayons ?? []).map(versCategorie);
+    const rayonsParId = new Map(categories.map((r) => [Number(r.id), r.slug]));
     setState((courant) => ({
       ...courant,
       products: contenu(produits).map(versProduit),
-      categories: (rayons ?? []).map(versCategorie),
+      categories,
       orders: contenu(commandes).map(versCommande),
       customers: contenu(clientes).map(versCliente),
-      promotions: contenu(campagnes).map(versPromotion),
+      promotions: contenu(campagnes).map((campagne) => versPromotion(campagne, rayonsParId)),
       library: {
         ...courant.library,
         sizes: (tailles ?? []).map(versTaille),
         colors: (coloris ?? []).map(versColoris),
+        materials: (matieres ?? []).map(versMatiere),
         media: contenu(medias).map(versMedia),
       },
       settings: reglages ? versReglages(reglages) : courant.settings,
@@ -249,8 +268,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       try {
         await action();
         await relire();
+        setNotification({ type: "success", message: "Modifications enregistrées." });
       } catch (e) {
-        setErreur(e instanceof Error ? e.message : "L'enregistrement a échoué.");
+        const message = e instanceof Error ? e.message : "L'enregistrement a échoué.";
+        setErreur(message);
+        setNotification({ type: "error", message });
         // On relit quand même : l'écran doit montrer l'état réel, pas celui
         // qu'on espérait.
         await relire();
@@ -266,6 +288,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     for (const categorie of state.categories) table.set(categorie.label, Number(categorie.id));
     return table;
   }, [state.categories]);
+
+  const matieresParNom = useMemo(() => {
+    const table = new Map<string, number>();
+    for (const matiere of state.library.materials) table.set(matiere.name, Number(matiere.id));
+    return table;
+  }, [state.library.materials]);
 
   /* --------------------------------------------------------- produits */
 
@@ -332,31 +360,103 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const rangerVariantes = useCallback(
+    async (produitId: number, produit: AdminProduct) => {
+      const tailles = new Map(state.library.sizes.map((t) => [t.value, Number(t.id)]));
+      const coloris = new Map(state.library.colors.map((c) => [c.name, Number(c.id)]));
+      const existantes = contenu(
+        await envoyer<Page<{ id: number; taille: number; coloris: number | null; stock: number }>>(
+          `/api/gestion/variantes/?produit=${produitId}&page_size=200`,
+        ),
+      );
+      const souhaitees = new Map<
+        string,
+        { taille: number; coloris: number | null; sku: string; stock: number }
+      >();
+
+      for (const varianteProduit of produit.variants) {
+        const taille = tailles.get(varianteProduit.size);
+        if (!taille) continue;
+        const colorisId = varianteProduit.color
+          ? (coloris.get(varianteProduit.color) ?? null)
+          : null;
+        const cle = `${taille}:${colorisId ?? ""}`;
+        const suffixe = [varianteProduit.size, varianteProduit.color]
+          .filter(Boolean)
+          .join("-")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .toUpperCase();
+        souhaitees.set(cle, {
+          taille,
+          coloris: colorisId,
+          sku: `${produit.sku}-${suffixe}`,
+          stock: varianteProduit.stock,
+        });
+      }
+
+      for (const variante of existantes) {
+        const cle = `${variante.taille}:${variante.coloris ?? ""}`;
+        const souhaitee = souhaitees.get(cle);
+        if (souhaitee) {
+          if (variante.stock !== souhaitee.stock) {
+            await envoyer(`/api/gestion/variantes/${variante.id}/`, "PATCH", {
+              stock: souhaitee.stock,
+            });
+          }
+          souhaitees.delete(cle);
+        } else if (variante.stock === 0) {
+          await envoyer(`/api/gestion/variantes/${variante.id}/`, "DELETE");
+        } else {
+          throw new Error("Une option encore en stock ne peut pas être retirée de la fiche.");
+        }
+      }
+
+      for (const variante of souhaitees.values()) {
+        await envoyer("/api/gestion/variantes/", "POST", {
+          produit: produitId,
+          taille: variante.taille,
+          coloris: variante.coloris,
+          sku: variante.sku,
+          stock: variante.stock,
+        });
+      }
+    },
+    [state.library.colors, state.library.sizes],
+  );
+
   const saveProduct = useCallback<AdminContextValue["saveProduct"]>(
     (produit) =>
       void ecrire(async () => {
+        const publier = produit.status === "publie";
         await envoyer(
           `/api/gestion/produits/${produit.id}/`,
           "PATCH",
-          depuisProduit(produit, rayonsParNom),
+          depuisProduit({ ...produit, status: "brouillon" }, rayonsParNom, matieresParNom),
         );
         await rangerPhotos(Number(produit.id), [produit.image, ...produit.gallery].filter(Boolean));
+        await rangerVariantes(Number(produit.id), produit);
+        if (publier) await envoyer(`/api/gestion/produits/${produit.id}/publier/`, "POST");
       }),
-    [ecrire, rayonsParNom],
+    [ecrire, matieresParNom, rangerPhotos, rangerVariantes, rayonsParNom],
   );
 
   const createProduct = useCallback<AdminContextValue["createProduct"]>(
     (produit) =>
       void ecrire(async () => {
+        const publier = produit.status === "publie";
         const cree = await envoyer<{ id: number }>(
           "/api/gestion/produits/",
           "POST",
-          depuisProduit(produit, rayonsParNom),
+          depuisProduit({ ...produit, status: "brouillon" }, rayonsParNom, matieresParNom),
         );
         // La fiche existe avant ses photos : elles ont besoin de son identifiant.
         await rangerPhotos(cree.id, [produit.image, ...produit.gallery].filter(Boolean));
+        await rangerVariantes(cree.id, produit);
+        if (publier) await envoyer(`/api/gestion/produits/${cree.id}/publier/`, "POST");
       }),
-    [ecrire, rayonsParNom, rangerPhotos],
+    [ecrire, matieresParNom, rangerPhotos, rangerVariantes, rayonsParNom],
   );
 
   const deleteProduct = useCallback<AdminContextValue["deleteProduct"]>(
@@ -439,7 +539,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         description: categorie.description,
         visible: categorie.active,
         ordre: categorie.order,
-        image: categorie.image ? undefined : null,
+        // Le rayon référence un média par son identifiant. L'éditeur manipule
+        // son URL pour pouvoir afficher l'aperçu : on retrouve donc ici le
+        // média correspondant avant d'envoyer la fiche au serveur.
+        image: categorie.image
+          ? Number(state.library.media.find((media) => media.src === categorie.image)?.id) || null
+          : null,
         parents,
       };
       void ecrire(() =>
@@ -448,11 +553,17 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           : envoyer("/api/gestion/rayons/", "POST", corps),
       );
     },
-    [ecrire, state.categories],
+    [ecrire, state.categories, state.library.media],
   );
 
   const deleteCategory = useCallback<AdminContextValue["deleteCategory"]>(
-    (id) => void ecrire(() => envoyer(`/api/gestion/rayons/${id}/`, "DELETE")),
+    (id, brouillons) => {
+      const params = new URLSearchParams();
+      if (brouillons) params.set("brouillons", brouillons.mode);
+      if (brouillons?.mode === "deplacer") params.set("destination", brouillons.destinationId);
+      const query = params.size ? `?${params.toString()}` : "";
+      void ecrire(() => envoyer(`/api/gestion/rayons/${id}/${query}`, "DELETE"));
+    },
     [ecrire],
   );
 
@@ -460,7 +571,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const savePromotion = useCallback<AdminContextValue["savePromotion"]>(
     (promotion) => {
-      const corps = depuisPromotion(promotion);
+      const rayonsParSlug = new Map(state.categories.map((r) => [r.slug, Number(r.id)]));
+      const corps = depuisPromotion(promotion, rayonsParSlug);
       void ecrire(() =>
         state.promotions.some((p) => p.id === promotion.id)
           ? envoyer(`/api/gestion/campagnes/${promotion.id}/`, "PATCH", corps)
@@ -484,11 +596,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const apres = new Map(tailles.map((t) => [t.value, t]));
       void ecrire(async () => {
         for (const [valeur, taille] of apres) {
-          if (!avant.has(valeur)) {
+          const precedente = avant.get(valeur);
+          if (!precedente) {
             await envoyer("/api/gestion/tailles/", "POST", {
               valeur,
               repere: taille.age,
               ordre: tailles.indexOf(taille),
+            });
+          } else if (precedente.age !== taille.age && precedente.id) {
+            await envoyer(`/api/gestion/tailles/${precedente.id}/`, "PATCH", {
+              repere: taille.age,
             });
           }
         }
@@ -501,15 +618,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       });
     },
     [ecrire, state.library.sizes],
-  );
-
-  const setSizeGuide = useCallback<AdminContextValue["setSizeGuide"]>(
-    (src) =>
-      setState((courant) => ({
-        ...courant,
-        library: { ...courant.library, sizeGuide: src },
-      })),
-    [],
   );
 
   const saveColor = useCallback<AdminContextValue["saveColor"]>(
@@ -529,10 +637,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [ecrire],
   );
 
-  const setMaterials = useCallback<AdminContextValue["setMaterials"]>(
-    (matieres) =>
-      setState((courant) => ({ ...courant, library: { ...courant.library, materials: matieres } })),
-    [],
+  const saveMaterial = useCallback<AdminContextValue["saveMaterial"]>(
+    (name) => void ecrire(() => envoyer("/api/gestion/matieres/", "POST", { nom: name })),
+    [ecrire],
+  );
+
+  const deleteMaterial = useCallback<AdminContextValue["deleteMaterial"]>(
+    (id) => void ecrire(() => envoyer(`/api/gestion/matieres/${id}/`, "DELETE")),
+    [ecrire],
   );
 
   const addMedia = useCallback<AdminContextValue["addMedia"]>(
@@ -604,6 +716,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       hydrated,
       enCours,
       erreur,
+      notification,
+      dismissNotification: () => setNotification(null),
+      notify: (type, message) => setNotification({ type, message }),
       saveProduct,
       createProduct,
       deleteProduct,
@@ -616,10 +731,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       savePromotion,
       deletePromotion,
       saveSizes,
-      setSizeGuide,
       saveColor,
       deleteColor,
-      setMaterials,
+      saveMaterial,
+      deleteMaterial,
       addMedia,
       televerserMedia,
       removeMedia,
@@ -628,10 +743,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       resetDemoData,
     }),
     [
-      state, hydrated, enCours, erreur, saveProduct, createProduct, deleteProduct,
+      state, hydrated, enCours, erreur, notification, saveProduct, createProduct, deleteProduct,
       duplicateProduct, setProductStatus, setStock, setOrderStatus, saveCategory,
-      deleteCategory, savePromotion, deletePromotion, saveSizes, setSizeGuide,
-      saveColor, deleteColor, setMaterials, addMedia, televerserMedia, removeMedia, updateHero,
+      deleteCategory, savePromotion, deletePromotion, saveSizes,
+      saveColor, deleteColor, saveMaterial, deleteMaterial, addMedia, televerserMedia, removeMedia, updateHero,
       updateSettings, resetDemoData,
     ],
   );
@@ -787,7 +902,7 @@ export function computeCustomerStats(
       let segment: CustomerSegment = "nouvelle";
       if (entree.spent >= 120_000) segment = "vip";
       else if (entree.orders >= 3) segment = "fidele";
-      if (jours > 90) segment = "endormie";
+      if (entree.last && jours > 90) segment = "endormie";
 
       return { customer, orders: entree.orders, spent: entree.spent, lastOrder: entree.last, segment };
     })

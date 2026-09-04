@@ -9,6 +9,7 @@ import type { AdminProduct, ProductStatus } from "@/lib/admin/types";
 import {
   Button,
   DeleteButton,
+  Modal,
   PageHeader,
   Pills,
   ProductChip,
@@ -24,15 +25,18 @@ const FILTRES: { value: Filtre; label: string }[] = [
   { value: "publie", label: "Publiés" },
   { value: "brouillon", label: "Brouillons" },
   { value: "rupture", label: "Ruptures" },
-  { value: "archive", label: "Archivés" },
 ];
 
 export default function Page() {
   const router = useRouter();
-  const { products, setStock, setProductStatus, duplicateProduct, deleteProduct, hydrated } =
+  const { products, setProductStatus, duplicateProduct, deleteProduct, hydrated } =
     useAdmin();
   const [filtre, setFiltre] = useState<Filtre>("tous");
   const [recherche, setRecherche] = useState("");
+  const [changementStatut, setChangementStatut] = useState<{
+    produit: AdminProduct;
+    statut: "publie" | "brouillon";
+  } | null>(null);
 
   const compte = (f: Filtre) => {
     if (f === "tous") return products.length;
@@ -68,7 +72,7 @@ export default function Page() {
       <PageHeader
         eyebrow="Catalogue"
         title="Produits"
-        sub="Toute fiche naît en brouillon. Un brouillon n'apparaît jamais en boutique, et une fiche publiée sans stock se signale d'elle-même."
+        sub="Tout produit naît en brouillon. Un brouillon n'apparaît jamais en boutique, et un produit publié sans stock se signale de lui-même."
       >
         <Link href="/admin/produits/nouveau">
           <Button variant="rose">
@@ -97,10 +101,10 @@ export default function Page() {
         rows={liste}
         keyOf={(p) => p.id}
         pageSize={15}
-        unite="fiches"
+        unite="produits"
         empty={
           recherche || filtre !== "tous"
-            ? "Aucune fiche ne correspond à ce filtre."
+            ? "Aucun produit ne correspond à ce filtre."
             : "Le catalogue est vide."
         }
         cells={(p: AdminProduct) => [
@@ -117,7 +121,7 @@ export default function Page() {
                 {p.name}
               </Link>
               <span className="mt-0.5 block text-[11.5px] text-muted">
-                {p.category} · {p.age} ans
+                {p.category}{p.materials.length ? ` · ${p.materials.join(", ")}` : ""}
               </span>
             </span>
           </span>,
@@ -130,18 +134,9 @@ export default function Page() {
             {formatXOF(p.price)}
           </span>,
 
-          /* Le stock se corrige sans ouvrir la fiche : c'est le geste le plus
-             fréquent du back-office. */
-          <input
-            key="stock"
-            type="number"
-            min={0}
-            value={p.stock}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => setStock(p.id, Math.max(0, Number(e.target.value) || 0))}
-            aria-label={`Stock de ${p.name}`}
-            className="w-16 rounded-lg border-[1.5px] border-[#ece3e7] bg-white px-2 py-1.5 text-[13px] tabular-nums outline-none transition-colors focus:border-rose"
-          />,
+          <span key="stock" className="text-[13px] font-semibold tabular-nums" title="Somme des stocks par option">
+            {p.stock}
+          </span>,
 
           <ProductChip key="st" status={p.status} stock={p.stock} />,
 
@@ -152,7 +147,7 @@ export default function Page() {
                 variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setProductStatus(p.id, "brouillon");
+                  setChangementStatut({ produit: p, statut: "brouillon" });
                 }}
               >
                 Dépublier
@@ -163,7 +158,7 @@ export default function Page() {
                 variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setProductStatus(p.id, "publie");
+                  setChangementStatut({ produit: p, statut: "publie" });
                 }}
               >
                 <IconEye />
@@ -196,6 +191,28 @@ export default function Page() {
           </span>,
         ]}
       />
+
+      <Modal
+        open={Boolean(changementStatut)}
+        onClose={() => setChangementStatut(null)}
+        title={changementStatut?.statut === "publie" ? "Publier ce produit ?" : "Dépublier ce produit ?"}
+      >
+        <div className="flex justify-end gap-2.5">
+          <Button variant="ghost" onClick={() => setChangementStatut(null)}>
+            Annuler
+          </Button>
+          <Button
+            variant="rose"
+            onClick={() => {
+              if (!changementStatut) return;
+              setProductStatus(changementStatut.produit.id, changementStatut.statut);
+              setChangementStatut(null);
+            }}
+          >
+            Confirmer
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }

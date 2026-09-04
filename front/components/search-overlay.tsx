@@ -4,10 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { formatXOF } from "@/lib/format";
+import { lireCatalogue } from "@/lib/catalogue";
+import type { Product } from "@/lib/products";
 import {
-  chercherProduits,
-  chercherRayons,
-  compterRayon,
   RECHERCHES_FREQUENTES,
   surligner,
 } from "@/lib/search";
@@ -52,6 +51,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   const [requete, setRequete] = useState("");
   const [recentes, setRecentes] = useState<string[]>([]);
   const [curseur, setCurseur] = useState(0);
+  const [produits, setProduits] = useState<Product[]>([]);
   const champ = useRef<HTMLInputElement>(null);
 
   /* Lecture différée : le premier rendu doit rester identique serveur et client. */
@@ -69,6 +69,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     setRequete("");
     setCurseur(0);
     const t = window.setTimeout(() => champ.current?.focus(), 50);
+    void lireCatalogue().then(setProduits);
     return () => window.clearTimeout(t);
   }, [open]);
 
@@ -82,8 +83,25 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
     };
   }, [open]);
 
-  const rayons = useMemo(() => chercherRayons(requete).slice(0, 2), [requete]);
-  const pieces = useMemo(() => chercherProduits(requete, 24), [requete]);
+  const q = requete.toLocaleLowerCase("fr").trim();
+  const rayons = useMemo(
+    () =>
+      [...new Set(produits.map((p) => p.category))]
+        .filter((rayon) => !q || rayon.toLocaleLowerCase("fr").includes(q))
+        .slice(0, 2),
+    [produits, q],
+  );
+  const pieces = useMemo(
+    () =>
+      produits.filter(
+        (p) =>
+          !q ||
+          [p.name, p.category, p.description].some((v) =>
+            v.toLocaleLowerCase("fr").includes(q),
+          ),
+      ),
+    [produits, q],
+  );
 
   const elements = useMemo<Element[]>(() => {
     const liste: Element[] = rayons.map((rayon) => ({
@@ -91,9 +109,9 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       id: rayon,
       href: `/boutique?cat=${encodeURIComponent(rayon)}`,
       nom: rayon,
-      nombre: compterRayon(rayon),
+      nombre: produits.filter((p) => p.category === rayon).length,
     }));
-    for (const { product } of pieces.slice(0, 6)) {
+    for (const product of pieces.slice(0, 6)) {
       liste.push({
         type: "piece",
         id: product.id,
@@ -106,7 +124,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
       });
     }
     return liste;
-  }, [rayons, pieces]);
+  }, [rayons, pieces, produits]);
 
   useEffect(() => setCurseur(0), [requete]);
 

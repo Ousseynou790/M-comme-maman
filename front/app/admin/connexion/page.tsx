@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { IconLock, IconMail } from "@/components/icons";
+import { IconClose, IconLock, IconMail } from "@/components/icons";
 import { ErreurApi, envoyer as appeler } from "@/lib/api";
 
 /* La connexion passe par la même route que celle des clientes : c'est le rôle
@@ -25,6 +25,12 @@ export default function Page() {
       })
       .catch(() => undefined);
   }, [router]);
+
+  useEffect(() => {
+    if (!erreur) return;
+    const minuteur = window.setTimeout(() => setErreur(""), 4200);
+    return () => window.clearTimeout(minuteur);
+  }, [erreur]);
 
   const envoyer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +65,16 @@ export default function Page() {
   return (
     <div className="grid min-h-screen place-items-center bg-[#faf8f9] px-5 py-12">
       <div className="w-full max-w-[420px]">
+        {erreur && (
+          <div className="fixed right-4 top-4 z-100 w-[min(24rem,calc(100vw-2rem))] anim-slide-in sm:right-6 sm:top-6">
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose/35 bg-white px-4 py-3.5 text-rose-deep shadow-[0_14px_40px_rgba(38,25,31,.18)]">
+              <span className="min-w-0 flex-1 text-[13px] font-semibold leading-relaxed">{erreur}</span>
+              <button type="button" onClick={() => setErreur("")} aria-label="Fermer la notification" className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-black/5">
+                <IconClose className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mb-7 text-center">
           <span className="text-[11px] font-bold uppercase tracking-[.16em] text-rose">
             Administration
@@ -66,21 +82,12 @@ export default function Page() {
           <h1 className="mt-2.5 text-[28px] font-extrabold leading-tight tracking-[-.035em]">
             Back-office
           </h1>
-          <p className="mt-2 text-[13.5px] text-muted">
-            Commandes, catalogue, promotions et contenu de la page d&apos;accueil.
-          </p>
         </div>
 
         <form
           onSubmit={envoyer}
           className="rounded-[24px] border border-line bg-white p-6 sm:p-7"
         >
-          {erreur && (
-            <p className="anim-fade-up mb-4 rounded-2xl bg-rose-soft px-4 py-3 text-[13px] font-semibold text-rose-deep">
-              {erreur}
-            </p>
-          )}
-
           <label className="block">
             <span className="mb-1.5 block text-[12.5px] font-bold">Adresse e-mail</span>
             <span className="relative block">

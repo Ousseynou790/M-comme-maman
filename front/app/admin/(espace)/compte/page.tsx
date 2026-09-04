@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ErreurApi, envoyer } from "@/lib/api";
 import { Button, Field, Input, PageHeader, Section } from "@/components/admin/ui";
-import { IconCheck, IconLockAdmin } from "@/components/admin/icons";
+import { IconLockAdmin, IconX } from "@/components/admin/icons";
 
 /**
  * Mon compte, côté back-office.
@@ -52,6 +52,16 @@ export default function Page() {
   const [confirmation, setConfirmation] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [messageMotDePasse, setMessageMotDePasse] = useState<Message>(null);
+  const notification = messageMotDePasse ?? messageIdentite;
+
+  useEffect(() => {
+    if (!notification) return;
+    const minuteur = window.setTimeout(() => {
+      setMessageIdentite(null);
+      setMessageMotDePasse(null);
+    }, 4200);
+    return () => window.clearTimeout(minuteur);
+  }, [notification]);
 
   useEffect(() => {
     envoyer<{ utilisateur: Utilisateur | null }>("/api/compte/moi/")
@@ -138,10 +148,34 @@ export default function Page() {
 
   return (
     <>
+      {notification && (
+        <div className="fixed right-4 top-4 z-100 w-[min(24rem,calc(100vw-2rem))] anim-slide-in sm:right-6 sm:top-6">
+          <div
+            role={notification.ok ? "status" : "alert"}
+            className={`flex items-start gap-3 rounded-xl border bg-white px-4 py-3.5 shadow-[0_14px_40px_rgba(38,25,31,.18)] ${
+              notification.ok ? "border-[#b9dfc8] text-[#256b46]" : "border-rose/35 text-rose-deep"
+            }`}
+          >
+            <span className="min-w-0 flex-1 text-[13px] font-semibold leading-relaxed">
+              {notification.texte}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setMessageIdentite(null);
+                setMessageMotDePasse(null);
+              }}
+              aria-label="Fermer la notification"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-black/5"
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <PageHeader
         eyebrow="Mon compte"
         title={moi?.nom ?? "Mon compte"}
-        sub="Votre accès au back-office."
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr] lg:items-start">
@@ -176,28 +210,15 @@ export default function Page() {
               </div>
             </div>
 
-            {messageIdentite && (
-              <p
-                className={`rounded-2xl px-4 py-3 text-[12.5px] font-semibold leading-relaxed ${
-                  messageIdentite.ok ? "bg-[#e6f2ea] text-[#2e7d52]" : "bg-rose-soft text-rose-deep"
-                }`}
-              >
-                {messageIdentite.texte}
-              </p>
-            )}
-
-            <div className="flex items-center gap-3">
+            <div>
               <Button type="submit" variant="rose" disabled={!modifie || enregistre}>
                 {enregistre ? "Enregistrement…" : "Enregistrer"}
               </Button>
-              {messageIdentite?.ok && !modifie && (
-                <IconCheck className="h-4 w-4 text-[#2e7d52]" />
-              )}
             </div>
           </form>
         </Section>
 
-        <Section title="Mot de passe" sub="Il faut connaître l'actuel pour en poser un nouveau.">
+        <Section title="Mot de passe">
           <form onSubmit={changerMotDePasse} className="flex flex-col gap-3.5">
             <Field label="Mot de passe actuel">
               <Input
@@ -208,10 +229,7 @@ export default function Page() {
               />
             </Field>
 
-            <Field
-              label="Nouveau mot de passe"
-              hint="Au moins huit caractères, et pas un mot courant."
-            >
+            <Field label="Nouveau mot de passe">
               <Input
                 type="password"
                 value={nouveau}
@@ -228,18 +246,6 @@ export default function Page() {
                 autoComplete="new-password"
               />
             </Field>
-
-            {messageMotDePasse && (
-              <p
-                className={`rounded-2xl px-4 py-3 text-[12.5px] font-semibold leading-relaxed ${
-                  messageMotDePasse.ok
-                    ? "bg-[#e6f2ea] text-[#2e7d52]"
-                    : "bg-rose-soft text-rose-deep"
-                }`}
-              >
-                {messageMotDePasse.texte}
-              </p>
-            )}
 
             <div>
               <Button type="submit" variant="rose" disabled={envoi}>

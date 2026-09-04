@@ -24,19 +24,73 @@ from .models import (
 
 # ------------------------------------------------------------------ référentiels
 
+def _texte_propre(valeur: str) -> str:
+    """Évite que des espaces invisibles créent deux entrées apparemment identiques."""
+    return " ".join(valeur.split())
+
+
+def _refuser_doublon(serializer, queryset, champ: str, valeur: str, message: str) -> str:
+    recherche = {f"{champ}__iexact": valeur}
+    doublons = queryset.filter(**recherche)
+    if serializer.instance:
+        doublons = doublons.exclude(pk=serializer.instance.pk)
+    if doublons.exists():
+        raise serializers.ValidationError(message)
+    return valeur
+
 class TailleSerializer(serializers.ModelSerializer):
+    def validate_valeur(self, valeur):
+        valeur = _texte_propre(valeur)
+        return _refuser_doublon(
+            self,
+            Taille.objects.all(),
+            "valeur",
+            valeur,
+            "Cette taille existe déjà.",
+        )
+
     class Meta:
         model = Taille
         fields = ["id", "valeur", "repere", "ordre"]
 
 
 class ColorisSerializer(serializers.ModelSerializer):
+    def validate_nom(self, valeur):
+        valeur = _texte_propre(valeur)
+        return _refuser_doublon(
+            self,
+            Coloris.objects.all(),
+            "nom",
+            valeur,
+            "Ce coloris existe déjà.",
+        )
+
+    def validate_hexa(self, valeur):
+        valeur = valeur.lower()
+        return _refuser_doublon(
+            self,
+            Coloris.objects.all(),
+            "hexa",
+            valeur,
+            "Cette teinte est déjà utilisée par un autre coloris.",
+        )
+
     class Meta:
         model = Coloris
         fields = ["id", "nom", "hexa"]
 
 
 class MatiereSerializer(serializers.ModelSerializer):
+    def validate_nom(self, valeur):
+        valeur = _texte_propre(valeur)
+        return _refuser_doublon(
+            self,
+            Matiere.objects.all(),
+            "nom",
+            valeur,
+            "Cette matière existe déjà.",
+        )
+
     class Meta:
         model = Matiere
         fields = ["id", "nom"]
@@ -206,6 +260,8 @@ class ProduitVitrineSerializer(serializers.ModelSerializer):
 
     rayon_nom = serializers.CharField(source="rayon.nom", read_only=True)
     rayon_slug = serializers.CharField(source="rayon.slug", read_only=True)
+    univers = serializers.CharField(source="rayon.univers", read_only=True)
+    matiere = serializers.CharField(source="composition", read_only=True)
     image = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
     tailles = serializers.SerializerMethodField()
@@ -220,7 +276,7 @@ class ProduitVitrineSerializer(serializers.ModelSerializer):
         fields = [
             "id", "slug", "nom", "prix", "prix_barre", "description", "matiere",
             "prix_public", "prix_avant", "promotion",
-            "rayon_nom", "rayon_slug", "univers", "genre", "age",
+            "rayon_nom", "rayon_slug", "univers",
             "image", "photos", "tailles", "coloris", "en_rupture",
         ]
 
@@ -330,6 +386,10 @@ class ProduitAdminSerializer(serializers.ModelSerializer):
     photos = PhotoProduitSerializer(many=True, read_only=True)
     variantes = VarianteSerializer(many=True, read_only=True)
     rayon_nom = serializers.CharField(source="rayon.nom", read_only=True)
+    univers = serializers.CharField(source="rayon.univers", read_only=True)
+    matieres_noms = serializers.SlugRelatedField(
+        source="matieres", many=True, read_only=True, slug_field="nom"
+    )
     stock_total = serializers.IntegerField(read_only=True)
     manques = serializers.SerializerMethodField()
     publiable = serializers.BooleanField(read_only=True)
@@ -337,8 +397,8 @@ class ProduitAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Produit
         fields = [
-            "id", "slug", "nom", "sku", "prix", "prix_barre", "description", "matiere",
-            "rayon", "rayon_nom", "univers", "genre", "age", "statut",
+            "id", "slug", "nom", "sku", "prix", "prix_barre", "description",
+            "rayon", "rayon_nom", "univers", "matieres", "matieres_noms", "statut",
             "photos", "variantes", "stock_total", "manques", "publiable",
             "cree_le", "modifie_le",
         ]

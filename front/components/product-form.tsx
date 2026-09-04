@@ -4,12 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatXOF } from "@/lib/format";
-import type { Age, Gender } from "@/lib/products";
 import { useAdmin } from "@/lib/admin/store";
 import { slugify } from "@/lib/admin/seed";
-import { AGES, GENDERS, type AdminProduct } from "@/lib/admin/types";
+import type { AdminProduct } from "@/lib/admin/types";
 import { Button, Modal } from "./admin/ui";
-import { IconArrowLeft, IconCheck, IconImage, IconPlus, IconX } from "./admin/icons";
+import { IconArrowLeft, IconCheck, IconPlus, IconTrash, IconX } from "./admin/icons";
 
 const inputClass =
   "w-full rounded-2xl border-[1.5px] border-[#ece3e7] bg-white px-4 py-3.5 text-sm outline-none transition-colors placeholder:text-[#b3a5aa] focus:border-rose";
@@ -100,18 +99,34 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
 
   const premierRayon = rayons[0]?.options[0]?.label ?? "";
   const [category, setCategory] = useState<string>(product?.category ?? premierRayon);
-  const [age, setAge] = useState<Age>(product?.age ?? "2-10");
-  const [gender, setGender] = useState<Gender>(product?.gender ?? "mixte");
   const [description, setDescription] = useState(product?.description ?? "");
   const [photos, setPhotos] = useState<string[]>(
     product ? [product.image, ...product.gallery].filter(Boolean) : []
   );
   const [colors, setColors] = useState<string[]>(product?.colors ?? []);
   const [sizes, setSizes] = useState<string[]>(product?.sizes ?? []);
-  const [stock, setStock] = useState(product ? String(product.stock) : "");
+  const [materials, setMaterials] = useState<string[]>(product?.materials ?? []);
+  const [variantStocks, setVariantStocks] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      (product?.variants ?? []).map((v) => [`${v.size}\u0000${v.color}`, v.stock]),
+    ),
+  );
+  const [variantesExclues, setVariantesExclues] = useState<Set<string>>(() => {
+    if (!product) return new Set();
+    const presentes = new Set(product.variants.map((v) => `${v.size}\u0000${v.color}`));
+    const couleurs = product.colors.length ? product.colors : [""];
+    return new Set(
+      product.sizes
+        .flatMap((size) => couleurs.map((color) => `${size}\u0000${color}`))
+        .filter((cle) => !presentes.has(cle)),
+    );
+  });
+  const [varianteASupprimer, setVarianteASupprimer] = useState<{
+    key: string;
+    label: string;
+  } | null>(null);
   const [photothegue, setPhotothegue] = useState(false);
   const [adresse, setAdresse] = useState("");
-  const [enregistre, setEnregistre] = useState<"none" | "brouillon" | "publie">("none");
 
   const referencesPrises = useMemo(
     () => new Set(products.filter((p) => p.id !== product?.id).map((p) => p.sku)),
@@ -144,11 +159,23 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
     if (priceNumber <= 0) list.push("un prix supérieur à zéro");
     if (description.trim().length < 20) list.push("une description d'au moins 20 caractères");
     if (!sku.trim()) list.push("une référence interne");
+    if (sizes.length === 0) list.push("au moins une taille ou option de vente");
     return list;
-  }, [name, photos.length, priceNumber, description, sku]);
+  }, [name, photos.length, priceNumber, description, sku, sizes.length]);
 
-  const canPublish = blockers.length === 0;
-  const variantCount = Math.max(1, colors.length) * Math.max(1, sizes.length);
+  const variantChoices = useMemo(
+    () =>
+      sizes.flatMap((size) =>
+        (colors.length ? colors : [""]).map((color) => ({
+          size,
+          color,
+          key: `${size}\u0000${color}`,
+        })),
+      ).filter((variante) => !variantesExclues.has(variante.key)),
+    [colors, sizes, variantesExclues],
+  );
+  const variantCount = variantChoices.length;
+  const canPublish = blockers.length === 0 && variantCount > 0;
 
   /* Deux fiches qui partagent une adresse s'écrasent en boutique. */
   const slugPris = slug
@@ -170,7 +197,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
 
     const fiche: AdminProduct = {
       id: product?.id ?? `prod-${Date.now().toString(36)}`,
-      univers: product?.univers ?? "enfant",
+      univers: categories.find((c) => c.label === category)?.univers ?? "enfant",
       slug: slug || `fiche-${Date.now().toString(36)}`,
       name: name.trim(),
       sku: sku.trim(),
@@ -179,16 +206,21 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
          le sien tant qu'on ne le change pas. */
       ...(product?.compareAt ? { compareAt: product.compareAt } : {}),
       category,
-      gender,
-      age,
       image: photos[0] ?? "",
       gallery: photos.slice(1),
       description: description.trim(),
       colors,
       sizes,
-      stock: Number(stock.replace(/\D/g, "")) || 0,
+      materials,
+      variants: variantChoices.map(({ size, color, key }) => ({
+        id: product?.variants.find((v) => v.size === size && v.color === color)?.id,
+        size,
+        color,
+        stock: variantStocks[key] ?? 0,
+      })),
+      stock: variantChoices.reduce((total, v) => total + (variantStocks[v.key] ?? 0), 0),
       status: statut,
-      outOfStock: (Number(stock.replace(/\D/g, "")) || 0) <= 0,
+      outOfStock: variantChoices.every((v) => (variantStocks[v.key] ?? 0) <= 0),
       createdAt: product?.createdAt ?? maintenant,
       updatedAt: maintenant,
     };
@@ -196,7 +228,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
     if (product) saveProduct(fiche);
     else createProduct(fiche);
 
-    setEnregistre(statut);
     window.setTimeout(() => router.push("/admin/produits"), 900);
   };
 
@@ -215,11 +246,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
           <h1 className="mt-2 text-[clamp(1.6rem,3vw,1.9rem)] font-extrabold tracking-[-.03em]">
             {product ? product.name : "Nouveau produit"}
           </h1>
-          <p className="mt-1.5 text-[13.5px] text-muted">
-            {product
-              ? "Les changements prennent effet dès l'enregistrement."
-              : "Enregistré en brouillon tant que la fiche n'est pas complète."}
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <Button variant="contour" onClick={() => enregistrer("brouillon")}>
@@ -236,22 +262,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
       </div>
 
 
-      {enregistre !== "none" && (
-        <div
-          className="anim-fade-up mt-5 flex items-center gap-3 rounded-2xl px-5 py-4 text-[13.5px] font-semibold"
-          style={
-            enregistre === "publie"
-              ? { background: "#eaf6ef", color: "#2e7d52" }
-              : { background: "#fdf3dc", color: "#8a6a12" }
-          }
-        >
-          <IconCheck className="h-4 w-4 shrink-0" />
-          {enregistre === "publie"
-            ? `« ${name} » est en ligne. Adresse en boutique : /p/${slug}.`
-            : `« ${name || "Sans titre"} » enregistré en brouillon. Invisible en boutique.`}
-        </div>
-      )}
-
       <div className="mt-6 grid items-start gap-5 xl:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-4">
           {/* -------------------------------------------------------- identité */}
@@ -261,11 +271,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
               <Field
                 label="Nom commercial"
                 span={2}
-                hint={
-                  name
-                    ? `Adresse en boutique : /p/${slug}`
-                    : "Ce que la cliente lit. Jamais un nom de fichier ni « Ensemble enfant-190 »."
-                }
               >
                 <input
                   value={name}
@@ -280,18 +285,12 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                   style={{ gridColumn: "span 2" }}
                   className="rounded-xl bg-rose-soft px-4 py-3 text-[12.5px] font-semibold text-rose-deep"
                 >
-                  Une autre fiche occupe déjà l&apos;adresse /p/{slug}. Changez le nom, sinon les
-                  deux se marcheront dessus en boutique.
+                  Un produit portant ce nom existe déjà.
                 </p>
               )}
 
               <Field
                 label="Référence interne"
-                hint={
-                  skuTouche
-                    ? "La vôtre. Elle doit rester unique."
-                    : "Proposée d'après le nom, modifiable."
-                }
               >
                 <input
                   value={sku}
@@ -306,19 +305,13 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
 
               <Field
                 label="Catégorie"
-                hint={
-                  rayons.length === 0
-                    ? undefined
-                    : "Rangez la fiche dans une sous-catégorie de préférence : c'est elle qui la fait apparaître en boutique."
-                }
               >
                 {rayons.length === 0 ? (
                   <p className="rounded-xl bg-rose-soft px-4 py-3 text-[12.5px] leading-relaxed text-rose-deep">
-                    Aucune catégorie n&apos;existe.{" "}
+                    Aucune catégorie disponible.{" "}
                     <Link href="/admin/categories" className="underline underline-offset-2">
-                      Créez-en une d&apos;abord
-                    </Link>{" "}
-                    : une fiche appartient toujours à un rayon.
+                      Ajouter une catégorie
+                    </Link>
                   </p>
                 ) : (
                   <select
@@ -339,46 +332,9 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 )}
               </Field>
 
-              <Field label="Tranche d'âge">
-                <div className="flex gap-2">
-                  {AGES.map((a) => (
-                    <button
-                      key={a.value}
-                      type="button"
-                      onClick={() => setAge(a.value)}
-                      className={`flex-1 rounded-xl border-[1.5px] px-2 py-3 text-[12.5px] font-semibold transition-colors ${
-                        age === a.value ? "border-ink bg-ink text-white" : "border-[#ece3e7] bg-white"
-                      }`}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Genre">
-                <div className="flex gap-2">
-                  {GENDERS.map((g) => (
-                    <button
-                      key={g.value}
-                      type="button"
-                      onClick={() => setGender(g.value)}
-                      className={`flex-1 rounded-xl border-[1.5px] px-2 py-3 text-[12.5px] font-semibold transition-colors ${
-                        gender === g.value
-                          ? "border-ink bg-ink text-white"
-                          : "border-[#ece3e7] bg-white"
-                      }`}
-                    >
-                      {g.label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
               <Field
                 label="Description"
                 span={2}
-                hint="Matière, coupe, entretien. C'est ce texte qui remplit la fiche et le référencement."
               >
                 <textarea
                   value={description}
@@ -390,25 +346,31 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
               </Field>
             </div>
 
-            {library.materials.length > 0 && (
-              <div className="mt-3.5">
-                <span className="text-[11.5px] font-bold text-muted">Matières courantes :</span>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {library.materials.map((m) => (
+            <div className="mt-4 border-t border-line pt-4">
+              <span className="text-[12.5px] font-bold">Composition</span>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {library.materials.map((m) => {
+                  const on = materials.includes(m.name);
+                  return (
                     <button
-                      key={m}
+                      key={m.id}
                       type="button"
-                      onClick={() =>
-                        setDescription((d) => (d.trim() ? `${d.trim()} ${m}.` : `${m}.`))
-                      }
-                      className="rounded-full border border-line bg-white px-3 py-1.5 text-[12px] font-semibold text-muted transition-colors hover:border-rose/40 hover:text-ink"
+                      onClick={() => bascule(materials, setMaterials, m.name)}
+                      className={`rounded-full border-[1.5px] px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
+                        on ? "border-ink bg-ink text-white" : "border-[#ece3e7] bg-white"
+                      }`}
                     >
-                      + {m}
+                      {m.name}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
+                {library.materials.length === 0 && (
+                  <Link href="/admin/configuration" className="text-[12.5px] font-semibold text-rose underline">
+                    Ajouter des matières dans la configuration
+                  </Link>
+                )}
               </div>
-            )}
+            </div>
           </section>
 
           {/* ---------------------------------------------------------- photos */}
@@ -453,18 +415,13 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
               </button>
             </div>
 
-            {photos.length === 0 && (
-              <p className="mt-3 text-[12px] text-muted">
-                Une fiche sans photo ne peut pas être publiée.
-              </p>
-            )}
           </section>
 
-          {/* --------------------------------------------------- prix et stock */}
+          {/* ------------------------------------------------------------- prix */}
           <section className="rounded-[20px] border border-line bg-white p-5 sm:p-6">
-            <h2 className="mb-4 text-[15px] font-extrabold tracking-tight">Prix et stock</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Prix de vente" hint="En francs CFA, nombre entier.">
+            <h2 className="mb-4 text-[15px] font-extrabold tracking-tight">Prix</h2>
+            <div className="max-w-md">
+              <Field label="Prix de vente">
                 <div className="relative">
                   <input
                     value={price}
@@ -479,15 +436,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 </div>
               </Field>
 
-              <Field label="Stock" hint="Zéro : la fiche se signale en rupture.">
-                <input
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))}
-                  placeholder="8"
-                  inputMode="numeric"
-                  className={inputClass}
-                />
-              </Field>
             </div>
           </section>
 
@@ -496,7 +444,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-[15px] font-extrabold tracking-tight">Variantes</h2>
               <span className="text-[12px] text-muted">
-                {variantCount} variante{variantCount > 1 ? "s" : ""} · réglées dans la bibliothèque
+                {variantCount} variante{variantCount > 1 ? "s" : ""} · stock géré par option
               </span>
             </div>
 
@@ -542,6 +490,49 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                 );
               })}
             </div>
+
+            {variantChoices.length > 0 && (
+              <div className="mt-6 overflow-hidden rounded-xl border border-line">
+                <div className="grid grid-cols-[1fr_110px_40px] bg-[#faf7f8] px-4 py-2.5 text-[11.5px] font-bold uppercase text-muted">
+                  <span>Option vendable</span>
+                  <span>Stock</span>
+                  <span />
+                </div>
+                {variantChoices.map(({ size, color, key }) => (
+                  <div
+                    key={key}
+                    className="grid grid-cols-[1fr_110px_40px] items-center gap-2 border-t border-line px-4 py-2.5"
+                  >
+                    <span className="text-[13px] font-semibold">
+                      {size}{color ? ` · ${color}` : ""}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={variantStocks[key] ?? 0}
+                      onChange={(e) =>
+                        setVariantStocks((stocks) => ({
+                          ...stocks,
+                          [key]: Math.max(0, Number(e.target.value) || 0),
+                        }))
+                      }
+                      aria-label={`Stock ${size}${color ? ` ${color}` : ""}`}
+                      className="w-full rounded-lg border-[1.5px] border-[#ece3e7] bg-white px-3 py-2 text-[13px] tabular-nums outline-none focus:border-rose"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVarianteASupprimer({ key, label: `${size}${color ? ` · ${color}` : ""}` })
+                      }
+                      aria-label={`Supprimer ${size}${color ? ` ${color}` : ""}`}
+                      className="grid h-9 w-9 place-items-center rounded-full text-muted transition-colors hover:bg-rose-soft hover:text-rose-deep"
+                    >
+                      <IconTrash className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 
@@ -562,12 +553,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
               </span>
             </div>
 
-            {canPublish ? (
-              <p className="mt-3.5 text-[13px] leading-relaxed text-muted">
-                La fiche est complète. À la publication, elle apparaît dans le catalogue et dans les
-                résultats de recherche.
-              </p>
-            ) : (
+            {!canPublish && (
               <>
                 <p className="mt-3.5 text-[13px] font-semibold">Il manque encore :</p>
                 <ul className="mt-2 flex flex-col gap-2">
@@ -615,7 +601,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
                   )}
                 </div>
                 <div className="mt-1 text-[12.5px] text-muted">
-                  {category} · {age} ans
+                  {category}{materials.length ? ` · ${materials.join(", ")}` : ""}
                 </div>
               </div>
             </div>
@@ -624,6 +610,29 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
       </div>
 
       {/* ----------------------------------------------------- photothèque */}
+      <Modal
+        open={Boolean(varianteASupprimer)}
+        onClose={() => setVarianteASupprimer(null)}
+        title={`Supprimer ${varianteASupprimer?.label ?? "cette option"} ?`}
+      >
+        <div className="flex justify-end gap-2.5">
+          <Button variant="ghost" onClick={() => setVarianteASupprimer(null)}>
+            Annuler
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (!varianteASupprimer) return;
+              setVariantesExclues((cles) => new Set(cles).add(varianteASupprimer.key));
+              setVarianteASupprimer(null);
+            }}
+          >
+            <IconTrash className="h-4 w-4" />
+            Supprimer
+          </Button>
+        </div>
+      </Modal>
+
       <Modal
         open={photothegue}
         onClose={() => setPhotothegue(false)}
@@ -655,9 +664,7 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
         </div>
 
         {library.media.length === 0 ? (
-          <p className="text-[13px] text-muted">
-            La photothèque est vide. Ajoutez-y des visuels depuis la bibliothèque.
-          </p>
+          <p className="text-[13px] text-muted">Photothèque vide.</p>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
             {library.media.map((m) => (
@@ -685,11 +692,6 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
           </div>
         )}
 
-        <p className="mt-5 flex items-center gap-2 text-[12px] text-muted">
-          <IconImage className="h-4 w-4 shrink-0" />
-          La première photo devient la principale : c&apos;est elle qui s&apos;affiche sur la carte
-          du catalogue.
-        </p>
       </Modal>
     </div>
   );

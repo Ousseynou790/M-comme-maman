@@ -243,6 +243,7 @@ export type RayonApi = {
   univers: "enfant" | "maman";
   description: string;
   image_url: string;
+  visible: boolean;
   ordre: number;
   nombre_produits: number;
 };

@@ -254,8 +254,7 @@ function DetailCommande({
             )}
             {commande.status === "annulee" && (
               <p className="rounded-2xl bg-rose-soft px-4 py-3 text-[12.5px] leading-relaxed text-rose-deep">
-                Commande annulée. Elle reste dans l&apos;historique : on ne réécrit pas le passé
-                d&apos;une boutique.
+                Commande annulée.
               </p>
             )}
           </div>

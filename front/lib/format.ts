@@ -1,3 +1,17 @@
+/**
+ * « jusqu'au 13 septembre » — la fin d'une promotion, dite à la cliente.
+ *
+ * Le fuseau est imposé : sans lui, le serveur et le navigateur peuvent tomber
+ * sur deux jours différents et React signale un écart d'hydratation.
+ */
+export function jusquAu(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
+
 export const formatXOF = (n: number) =>
   n.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ") + " F";
 

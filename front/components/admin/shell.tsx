@@ -217,7 +217,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const chemin = usePathname();
   const router = useRouter();
-  const { settings, orders, products, hydrated, erreur } = useAdmin();
+  const { settings, orders, products, hydrated, notification, dismissNotification } = useAdmin();
   const [menu, setMenu] = useState(false);
   const [palette, setPalette] = useState(false);
 
@@ -377,7 +377,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             {hydrated ? (
               <>
                 {orders.length} commande{orders.length > 1 ? "s" : ""} ·{" "}
-                {products.filter((p) => p.status === "publie").length} fiches publiées
+                {products.filter((p) => p.status === "publie").length} produits publiés
               </>
             ) : (
               "Lecture du back-office…"
@@ -400,17 +400,30 @@ export function AdminShell({ children }: { children: ReactNode }) {
             à gauche est tout l'effet : il détache la page de la colonne au lieu
             de les faire se toucher à angle droit. */}
         <div className="flex-1 rounded-t-[22px] bg-[#faf8f9] lg:rounded-tr-none lg:rounded-tl-[26px]">
-          {/* Un refus du serveur s'affichait nulle part : le clic ne faisait
-              rien et rien n'expliquait pourquoi. Ici, une seule fois pour
-              toutes les pages. */}
-          {erreur && (
-            <div className="px-4 pt-6 sm:px-6 lg:px-8">
-              <p
-                role="alert"
-                className="rounded-2xl bg-rose-soft px-4 py-3.5 text-[13px] font-semibold leading-relaxed text-rose-deep"
+          {notification && (
+            <div className="fixed right-4 top-4 z-100 w-[min(24rem,calc(100vw-2rem))] anim-slide-in sm:right-6 sm:top-6">
+              <div
+                role={notification.type === "error" ? "alert" : "status"}
+                className={`flex items-start gap-3 rounded-xl border bg-white px-4 py-3.5 shadow-[0_14px_40px_rgba(38,25,31,.18)] ${
+                  notification.type === "error"
+                    ? "border-rose/35 text-rose-deep"
+                    : notification.type === "warning"
+                      ? "border-[#e8cf8d] text-[#765b13]"
+                      : "border-[#b9dfc8] text-[#256b46]"
+                }`}
               >
-                {erreur}
-              </p>
+                <span className="min-w-0 flex-1 text-[13px] font-semibold leading-relaxed">
+                  {notification.message}
+                </span>
+                <button
+                  type="button"
+                  onClick={dismissNotification}
+                  aria-label="Fermer la notification"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-current transition-colors hover:bg-black/5"
+                >
+                  <IconX className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
           <main className="px-4 pb-16 pt-6 sm:px-6 lg:px-8">{children}</main>

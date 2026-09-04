@@ -1,4 +1,4 @@
-import type { Age, Gender, Product } from "@/lib/products";
+import type { Product } from "@/lib/products";
 
 /* ------------------------------------------------------------------ */
 /* Catalogue                                                           */
@@ -22,6 +22,15 @@ export interface AdminProduct extends Product {
   colors: string[];
   /** Valeurs de taille, tenues dans la bibliothèque. */
   sizes: string[];
+  /** Matières choisies dans le référentiel partagé. */
+  materials: string[];
+  /** Options réellement vendables et leur stock propre. */
+  variants: {
+    id?: string;
+    size: string;
+    color: string;
+    stock: number;
+  }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -161,6 +170,7 @@ export function promotionEndDate(
  * devienne une taille.
  */
 export interface SizeValue {
+  id?: string;
   /** Ce qui figure sur l'étiquette : S, 4, 24, TU… */
   value: string;
   /** Repère indicatif, souvent un âge. Vide la plupart du temps. */
@@ -173,6 +183,11 @@ export interface AdminColor {
   name: string;
   /** Couleur CSS de la pastille, au format #rrggbb. */
   hex: string;
+}
+
+export interface AdminMaterial {
+  id: string;
+  name: string;
 }
 
 /** Une image de la photothèque, partagée par les fiches et les rayons. */
@@ -190,8 +205,7 @@ export interface ProductLibrary {
   /** Visuel du guide des tailles. Facultatif. */
   sizeGuide: string;
   colors: AdminColor[];
-  /** Matières proposées en saisie rapide sur la fiche produit. */
-  materials: string[];
+  materials: AdminMaterial[];
   media: MediaItem[];
 }
 
@@ -246,15 +260,3 @@ export interface HeroConfig {
   custom: boolean;
   slides: HeroSlideConfig[];
 }
-
-/** Filtres d'âge et de genre, repris du catalogue pour les formulaires. */
-export const AGES: { value: Age; label: string }[] = [
-  { value: "2-10", label: "2 à 10 ans" },
-  { value: "11-14", label: "11 à 14 ans" },
-];
-
-export const GENDERS: { value: Gender; label: string }[] = [
-  { value: "fille", label: "Fille" },
-  { value: "garcon", label: "Garçon" },
-  { value: "mixte", label: "Mixte" },
-];

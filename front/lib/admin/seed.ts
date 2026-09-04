@@ -104,6 +104,8 @@ export function seedProducts(): AdminProduct[] {
       status,
       gallery: [],
       colors: [pick(rand, COLORS).name],
+    materials: [],
+    variants: [],
       sizes:
         product.category === "Chaussures"
           ? ["24", "26", "28", "30"]
@@ -308,7 +310,7 @@ export function seedLibrary(): ProductLibrary {
       "Lin lavé",
       "Denim léger",
       "Maille tricot",
-    ],
+    ].map((name) => ({ id: `mat-${slugify(name)}`, name })),
     media: PRODUCTS.map((product, index) => ({
       id: `media-${index + 1}`,
       src: product.image,

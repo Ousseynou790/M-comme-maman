@@ -188,7 +188,7 @@ export default function Page() {
         <Kpi
           label="Ruptures"
           value={String(ruptures)}
-          hint={ruptures > 0 ? "fiches publiées sans stock" : "aucune fiche en rupture"}
+          hint={ruptures > 0 ? "produits publiés sans stock" : "aucun produit en rupture"}
           tone={ruptures > 0 ? "#b3306a" : "#2e7d52"}
         />
       </div>
@@ -206,7 +206,7 @@ export default function Page() {
 
         <Section
           title="À surveiller"
-          sub="Fiches publiées dont le stock passe sous le seuil réglé."
+          sub="Produits publiés dont le stock passe sous le seuil réglé."
           action={
             <Link
               href="/admin/produits"
@@ -333,12 +333,12 @@ export default function Page() {
           </Section>
 
           <Section
-            title="Fiches sans vente"
+            title="Produits sans vente"
             sub="À retravailler : photo, prix ou mise en avant."
           >
             {sansVente.length === 0 ? (
               <p className="text-[13px] text-muted">
-                Toutes les fiches publiées ont vendu au moins une fois.
+                Tous les produits publiés ont vendu au moins une fois.
               </p>
             ) : (
               <ul className="flex flex-col gap-2">

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { formatXOF } from "@/lib/format";
-import { ADMIN_STORAGE_KEY, useAdmin } from "@/lib/admin/store";
+import { useAdmin } from "@/lib/admin/store";
 import type { HeroSlideConfig } from "@/lib/admin/types";
 import {
   Button,
@@ -13,7 +12,7 @@ import {
   Textarea,
   Toggle,
 } from "@/components/admin/ui";
-import { IconPlus, IconRefresh, IconTrash } from "@/components/admin/icons";
+import { IconPlus, IconTrash } from "@/components/admin/icons";
 
 const slideVide = (): HeroSlideConfig => ({
   src: "",
@@ -24,8 +23,7 @@ const slideVide = (): HeroSlideConfig => ({
 });
 
 export default function Page() {
-  const { settings, hero, updateSettings, updateHero, resetDemoData, hydrated } = useAdmin();
-  const [remise, setRemise] = useState(false);
+  const { settings, hero, updateSettings, updateHero, hydrated } = useAdmin();
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture des réglages…</p>;
 
@@ -89,7 +87,7 @@ export default function Page() {
                 inputMode="numeric"
               />
             </Field>
-            <Field label="Seuil de stock faible" hint="En dessous, la fiche remonte au tableau de bord.">
+            <Field label="Seuil de stock faible" hint="En dessous, le produit remonte au tableau de bord.">
               <Input
                 value={String(settings.lowStockThreshold)}
                 onChange={(v) => updateSettings({ lowStockThreshold: nombre(v) })}
@@ -145,42 +143,6 @@ export default function Page() {
           )}
         </Section>
 
-        {/* ------------------------------------------------------ démonstration */}
-        <Section
-          title="Données de démonstration"
-          sub="Le back-office écrit désormais dans la base. Ce bouton n'efface qu'un reliquat laissé par une version antérieure dans ce navigateur."
-        >
-          <p className="text-[13px] leading-relaxed text-muted">
-            Remettre la démonstration efface les fiches, commandes, rayons et campagnes créés ici et
-            réinstalle la graine de départ. Les comptes, paniers, commandes et avis de la vitrine ne
-            sont pas touchés : ce sont d&apos;autres clés.
-          </p>
-
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            {remise ? (
-              <>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    resetDemoData();
-                    setRemise(false);
-                  }}
-                >
-                  <IconTrash />
-                  Oui, tout remettre à zéro
-                </Button>
-                <Button variant="ghost" onClick={() => setRemise(false)}>
-                  Annuler
-                </Button>
-              </>
-            ) : (
-              <Button variant="contour" onClick={() => setRemise(true)}>
-                <IconRefresh />
-                Remettre la démonstration
-              </Button>
-            )}
-          </div>
-        </Section>
       </div>
 
       {/* -------------------------------------------------- bandeau d'accueil */}

@@ -57,9 +57,7 @@ def filtrer(selection, requete: str):
         selection = selection.filter(
             Q(nom__unaccent__icontains=terme)
             | Q(description__unaccent__icontains=terme)
-            | Q(matiere__unaccent__icontains=terme)
+            | Q(matieres__nom__unaccent__icontains=terme)
             | Q(rayon__nom__unaccent__icontains=terme)
-            | Q(genre__icontains=terme)
-            | Q(age__icontains=terme)
         )
-    return selection
+    return selection.distinct()
