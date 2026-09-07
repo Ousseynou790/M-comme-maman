@@ -51,6 +51,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Sert les fichiers statiques collectés (l'habillage de l'admin Django).
+    # Juste après SecurityMiddleware, comme le demande sa documentation.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -163,6 +166,21 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
+# En développement, vitrine et serveur partagent `localhost` : deux ports d'un
+# même site, un cookie « Lax » voyage sans problème. En ligne ils sont sur deux
+# domaines distincts (Vercel d'un côté, Render de l'autre), et « Lax » ferait
+# taire le cookie de session dès le premier appel du navigateur. « None » l'y
+# autorise ; le navigateur ne l'accepte qu'accompagné de « Secure », donc
+# jamais en développement où tout passe en clair.
+if not DEBUG:
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SAMESITE = "None"
+
+# Derrière le répartiteur de l'hébergeur, la requête arrive en HTTP même quand
+# le visiteur est en HTTPS. Sans cet en-tête, Django se croit en clair et refuse
+# de poser un cookie « Secure » — personne ne pourrait se connecter.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # ------------------------------------------------------------------ localisation
 
 LANGUAGE_CODE = "fr-fr"
@@ -175,8 +193,44 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# WhiteNoise compresse et empreinte les fichiers collectés : le navigateur les
+# garde en cache sans risquer de servir une version périmée après livraison.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ------------------------------------------------- photothèque sur Cloudflare R2
+#
+# L'instance de l'hébergeur n'a pas de disque persistant : ce qu'elle écrit dans
+# `media/` disparaît à la livraison suivante. Les visuels envoyés depuis le
+# back-office partent donc sur un entrepôt d'objets.
+#
+# Les cinq variables vont ensemble : s'il en manque une, on retombe sur le
+# disque local — le comportement de développement, où les fichiers déjà présents
+# dans `back/media/` n'existent pas sur le bucket.
+
+R2_ACCOUNT_ID = env("CLOUDFLARE_R2_ACCOUNT_ID", default="")
+R2_ACCESS_KEY_ID = env("CLOUDFLARE_R2_ACCESS_KEY_ID", default="")
+R2_SECRET_ACCESS_KEY = env("CLOUDFLARE_R2_SECRET_ACCESS_KEY", default="")
+R2_BUCKET_NAME = env("CLOUDFLARE_R2_BUCKET", default="")
+# Domaine public branché sur le bucket. L'adresse `pub-....r2.dev` convient pour
+# démarrer ; un domaine personnalisé (media.mcommaman.com) est préférable en
+# régime établi, celle de Cloudflare étant bridée en débit.
+R2_PUBLIC_DOMAIN = env("CLOUDFLARE_R2_PUBLIC_DOMAIN", default="")
+
+R2_ACTIF = all([
+    R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME, R2_PUBLIC_DOMAIN,
+])
+
+if R2_ACTIF:
+    STORAGES["default"] = {"BACKEND": "config.stockage.R2MediaStorage"}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -71,8 +71,20 @@ export async function lire<T>(
 
 /* ------------------------------------------------------------------ écriture */
 
-/** Le jeton CSRF, posé en cookie par le serveur au premier appel. */
+/**
+ * Le jeton CSRF, gardé en mémoire.
+ *
+ * En développement, vitrine et serveur partagent `localhost` : le cookie posé
+ * par Django est lisible ici, et c'est le repli. En ligne ils sont sur deux
+ * domaines distincts — `document.cookie` ne montrera jamais celui du serveur.
+ * D'où le jeton retenu tel que `/api/compte/csrf/` le renvoie dans son corps.
+ * Le cookie, lui, continue de voyager avec la requête : c'est le serveur qui
+ * compare les deux, pas nous.
+ */
+let jetonRetenu = "";
+
 function jetonCsrf(): string {
+  if (jetonRetenu) return jetonRetenu;
   const trouve = document.cookie
     .split("; ")
     .find((morceau) => morceau.startsWith("csrftoken="));
@@ -82,19 +94,29 @@ function jetonCsrf(): string {
 let cookieDemande = false;
 
 /**
- * S'assure que le cookie CSRF est posé.
+ * S'assure qu'on a un jeton CSRF.
  *
- * Une seule fois par chargement : le cookie survit ensuite à toutes les
- * requêtes de la session.
+ * Une seule fois par chargement, sauf après `oublierCsrf()` — la connexion
+ * fait tourner le jeton côté serveur, et l'ancien devient bon à jeter.
  */
 async function assurerCsrf(): Promise<void> {
   if (jetonCsrf() || cookieDemande) return;
   cookieDemande = true;
-  await fetch(`${BASE}/api/compte/csrf/`, { credentials: "include" }).catch(() => {
+  try {
+    const reponse = await fetch(`${BASE}/api/compte/csrf/`, { credentials: "include" });
+    const donnees = (await reponse.json()) as { jetonCsrf?: string };
+    jetonRetenu = donnees.jetonCsrf ?? "";
+  } catch {
     // Sans jeton, la première écriture échouera avec un message clair : mieux
     // vaut ça qu'un plantage silencieux au chargement de la page.
     cookieDemande = false;
-  });
+  }
+}
+
+/** Jette le jeton retenu, pour que le prochain envoi en redemande un neuf. */
+function oublierCsrf(): void {
+  jetonRetenu = "";
+  cookieDemande = false;
 }
 
 type Methode = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -112,16 +134,29 @@ export async function envoyer<T>(
 ): Promise<T> {
   if (methode !== "GET") await assurerCsrf();
 
-  const reponse = await fetch(`${BASE}${chemin}`, {
-    method: methode,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(corps ? { "Content-Type": "application/json" } : {}),
-      ...(methode !== "GET" ? { "X-CSRFToken": jetonCsrf() } : {}),
-    },
-    body: corps ? JSON.stringify(corps) : undefined,
-  });
+  const partir = () =>
+    fetch(`${BASE}${chemin}`, {
+      method: methode,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(corps ? { "Content-Type": "application/json" } : {}),
+        ...(methode !== "GET" ? { "X-CSRFToken": jetonCsrf() } : {}),
+      },
+      body: corps ? JSON.stringify(corps) : undefined,
+    });
+
+  let reponse = await partir();
+
+  // Se connecter fait tourner le jeton CSRF côté serveur : celui qu'on tenait
+  // ne vaut plus rien et l'écriture suivante repart en 403. On en redemande un
+  // et on rejoue une fois — la requête refusée n'a rien écrit, c'est sans
+  // risque, et l'utilisateur ne voit pas passer un échec qui n'en est pas un.
+  if (reponse.status === 403 && methode !== "GET") {
+    oublierCsrf();
+    await assurerCsrf();
+    if (jetonCsrf()) reponse = await partir();
+  }
 
   if (reponse.status === 204) return undefined as T;
 
@@ -145,12 +180,22 @@ export async function envoyer<T>(
 export async function televerser<T>(chemin: string, forme: FormData): Promise<T> {
   await assurerCsrf();
 
-  const reponse = await fetch(`${BASE}${chemin}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { Accept: "application/json", "X-CSRFToken": jetonCsrf() },
-    body: forme,
-  });
+  const partir = () =>
+    fetch(`${BASE}${chemin}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", "X-CSRFToken": jetonCsrf() },
+      body: forme,
+    });
+
+  let reponse = await partir();
+
+  // Même raison que dans `envoyer` : le jeton a pu tourner sous nos pieds.
+  if (reponse.status === 403) {
+    oublierCsrf();
+    await assurerCsrf();
+    if (jetonCsrf()) reponse = await partir();
+  }
 
   const donnees = await reponse.json().catch(() => null);
   if (!reponse.ok) {

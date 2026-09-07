@@ -6,9 +6,9 @@ l'équipe technique, pas la gérante — elle, elle a le back-office de la vitri
 """
 
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -19,10 +19,22 @@ urlpatterns = [
     path("api/", include("ventes.urls")),
 ]
 
-# En développement, c'est Django qui sert les images envoyées. En
-# production, ce sera le serveur de fichiers — jamais celui-ci.
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Les images envoyées depuis le back-office sont servies par Django, en
+# développement comme en production. Ce n'est pas ce qu'on fait de mieux — un
+# serveur de fichiers ou un CDN irait plus vite — mais la boutique n'en a que
+# quelques centaines et cela évite un service de plus à installer.
+#
+# À savoir : sur une instance sans disque persistant, le dossier `media/` est
+# reconstruit à chaque livraison. Les visuels envoyés depuis le back-office
+# disparaissent alors. Monter un disque, ou passer à un stockage externe, avant
+# que la gérante n'y range son catalogue.
+urlpatterns += [
+    re_path(
+        rf"^{settings.MEDIA_URL.lstrip('/')}(?P<path>.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+]
 
 admin.site.site_header = "M comme Maman — administration technique"
 admin.site.site_title = "M comme Maman"

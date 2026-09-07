@@ -190,7 +190,14 @@ class Media(models.Model):
 
             # Absolue, pas relative : la vitrine tourne sur un autre port et
             # `/media/...` la renverrait chez elle.
-            adresse = settings.URL_API.rstrip("/") + self.fichier.url
+            #
+            # Selon le stockage, `fichier.url` est déjà absolue — Cloudflare R2
+            # rend `https://<domaine>/photheque/...` — ou relative, quand les
+            # fichiers sont sur le disque et servis par Django. Préfixer une
+            # adresse déjà complète donnerait une URL inutilisable, d'où le test.
+            adresse = self.fichier.url
+            if not adresse.startswith(("http://", "https://")):
+                adresse = settings.URL_API.rstrip("/") + adresse
             if self.url != adresse:
                 self.url = adresse
                 super().save(update_fields=["url"])

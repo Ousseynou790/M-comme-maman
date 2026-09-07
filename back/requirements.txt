@@ -14,3 +14,16 @@ django-environ==0.12.0
 
 # Validation des images envoyées dans la photothèque (ImageField).
 Pillow==12.3.0
+
+# Production. `runserver` ne sert qu'au développement : en ligne c'est gunicorn
+# qui tient les requêtes, et WhiteNoise qui sert les fichiers statiques de
+# l'admin Django sans dépendre d'un serveur de fichiers séparé.
+gunicorn==23.0.0
+whitenoise==6.11.0
+
+# Photothèque sur Cloudflare R2 (compatible S3). `boto3` est le client, et
+# `s3transfer` sa dépendance d'envoi — épinglée pour que la livraison soit
+# reproductible.
+django-storages==1.14.6
+boto3==1.43.75
+s3transfer==0.19.2
