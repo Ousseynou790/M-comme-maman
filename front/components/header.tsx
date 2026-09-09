@@ -28,10 +28,12 @@ import {
    d'annonce, la jauge de lecture court sous la barre et se remplit au
    défilement — elle sert aussi de trait de séparation. */
 
+/* La barre ne nomme plus trois rayons choisis à la main — ils changent au gré
+   du catalogue, et le panneau « Boutique » les liste déjà tous. Restent les
+   deux univers, qui eux ne bougent pas : « /boutique » est celui des enfants,
+   « /coin-maman » celui des mamans. */
 const NAV = [
-  { href: "/boutique?cat=Ensembles", label: "Ensembles" },
-  { href: "/boutique?cat=Robes%20%26%20jupes", label: "Robes & jupes" },
-  { href: "/boutique?cat=Chaussures", label: "Chaussures" },
+  { href: "/boutique", label: "Enfants" },
   { href: "/coin-maman", label: "Coin Maman" },
   { href: "/avis", label: "Avis" },
   { href: "/contact", label: "Contact" },

@@ -10,7 +10,7 @@ import {
   RECHERCHES_FREQUENTES,
   surligner,
 } from "@/lib/search";
-import { IconArrow, IconClock, IconClose, IconReturn, IconSearch, IconTag } from "./icons";
+import { IconArrow, IconClock, IconClose, IconSearch, IconTag } from "./icons";
 
 const CLE_RECENTES = "mcm-recherches-recentes";
 const MAX_RECENTES = 6;
@@ -365,21 +365,6 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
         {/* ---------------------------------------------------------- le pied */}
         <div className="flex items-center justify-between gap-3 border-t border-line bg-mist px-5 py-3">
-          <p className="hidden items-center gap-3 text-[11px] text-muted sm:flex">
-            <span className="flex items-center gap-1">
-              <kbd className="rounded border border-line bg-white px-1.5 py-0.5">↑</kbd>
-              <kbd className="rounded border border-line bg-white px-1.5 py-0.5">↓</kbd> naviguer
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="grid h-[19px] place-items-center rounded border border-line bg-white px-1.5">
-                <IconReturn />
-              </kbd>
-              ouvrir
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="rounded border border-line bg-white px-1.5 py-0.5">esc</kbd> fermer
-            </span>
-          </p>
           <button
             type="button"
             onClick={toutVoir}

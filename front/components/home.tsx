@@ -17,13 +17,13 @@ import { ProductCard } from "./product-card";
 import {
   IconArrow,
   IconArrowUp,
-  IconGmail,
   IconInstagram,
   IconLeaf,
   IconQuote,
   IconRuler,
   IconShield,
   IconSmile,
+  IconTikTok,
   IconWhatsApp,
 } from "./icons";
 import { EnMouvement } from "./en-mouvement";
@@ -31,7 +31,7 @@ import { QuickView } from "./quick-view";
 import { useReviews } from "./reviews-context";
 import { StarRow } from "./review-form";
 import { Countdown } from "./countdown";
-import { INSTAGRAM, INSTAGRAM_URL, waLink } from "@/lib/format";
+import { INSTAGRAM, INSTAGRAM_URL, TIKTOK, TIKTOK_URL, waLink } from "@/lib/format";
 import { HERO_VIGNETTES, PROMO_END, type Product } from "@/lib/products";
 
 const REASSURANCE = [
@@ -160,8 +160,9 @@ const REVIEWS = [
   },
 ];
 
-/* Les deux façons d'atteindre la boutique. Le numéro est celui de `WHATSAPP`,
-   écrit ici en clair parce qu'il s'affiche autant qu'il sert de lien. */
+/* Les trois façons d'atteindre la boutique : une pour écrire, deux pour
+   regarder. Le numéro est celui de `WHATSAPP`, écrit ici en clair parce qu'il
+   s'affiche autant qu'il sert de lien. */
 const CONTACT = [
   {
     canal: "WhatsApp",
@@ -173,13 +174,13 @@ const CONTACT = [
     pastille: "bg-[#25d366] text-white",
   },
   {
-    canal: "Courriel",
-    valeur: "mamand202122@gmail.com",
-    delai: "Réponse sous 24 h",
-    href: "mailto:mamand202122@gmail.com",
-    externe: false,
-    Icone: IconGmail,
-    pastille: "bg-white",
+    canal: "TikTok",
+    valeur: `@${TIKTOK}`,
+    delai: "Les pièces en vidéo",
+    href: TIKTOK_URL,
+    externe: true,
+    Icone: IconTikTok,
+    pastille: "bg-ink text-white",
   },
   {
     canal: "Instagram",
@@ -345,47 +346,88 @@ export function Home({ products }: { products: Product[] }) {
             <h2 className={`${H2} mt-2.5`}>Ils vont adorer les porter</h2>
           </div>
 
-          <div className="relative flex gap-1 rounded-full bg-stone p-1.5">
-            <span
-              aria-hidden
-              className="absolute bottom-1.5 left-0 top-1.5 rounded-full bg-ink transition-[transform,width] duration-450 ease-back"
-              style={{ transform: `translateX(${pill.left}px)`, width: pill.width, opacity: pill.width ? 1 : 0 }}
-            />
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                ref={(el) => {
-                  tabRefs.current[t.key] = el;
-                }}
-                onClick={() => setTab(t.key)}
-                aria-pressed={tab === t.key}
-                className={`relative z-10 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors duration-300 sm:px-4.5 ${
-                  tab === t.key ? "text-white" : "text-[#6b5a61] hover:text-ink"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* Un seul onglet « Tous » sur un catalogue vide : on n'affiche rien. */}
+          {products.length > 0 && (
+            <div className="relative flex gap-1 rounded-full bg-stone p-1.5">
+              <span
+                aria-hidden
+                className="absolute bottom-1.5 left-0 top-1.5 rounded-full bg-ink transition-[transform,width] duration-450 ease-back"
+                style={{ transform: `translateX(${pill.left}px)`, width: pill.width, opacity: pill.width ? 1 : 0 }}
+              />
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  ref={(el) => {
+                    tabRefs.current[t.key] = el;
+                  }}
+                  onClick={() => setTab(t.key)}
+                  aria-pressed={tab === t.key}
+                  className={`relative z-10 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors duration-300 sm:px-4.5 ${
+                    tab === t.key ? "text-white" : "text-[#6b5a61] hover:text-ink"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </Reveal>
 
-        {/* Le rail est toujours rendu — les pièces doivent être dans le HTML
+        {/* Catalogue vide (boutique qui ouvre, tout dépublié) : un mot d'attente
+            plutôt qu'un blanc sous le titre.
+            Sinon le rail est toujours rendu — les pièces doivent être dans le HTML
             servi. La clé change quand la section entre à l'écran et à chaque
             changement d'onglet : les cartes sont recréées et la cascade rejoue,
             jamais dans le vide pendant que la section est encore hors champ. */}
-        <div ref={railRef}>
-          <Carousel label="Sélection de pièces" key={`${tab}-${railSeen}`}>
-            {shown.map((p, i) => (
-              <div key={p.id} className="w-[68vw] sm:w-[42vw] md:w-[30vw] lg:w-[280px] xl:w-[300px]">
-                <ProductCard
-                  product={p}
-                  onQuickView={setQuick}
-                  delay={railSeen ? i * 70 : undefined}
-                />
-              </div>
-            ))}
-          </Carousel>
-        </div>
+        {shown.length === 0 ? (
+          <Reveal className="rounded-[26px] border border-line bg-white px-8 py-14 text-center">
+            <span className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-rose-soft">
+              <IconSmile className="h-6 w-6 text-rose" />
+            </span>
+            <h3 className="text-xl font-extrabold tracking-tight">
+              Les pièces arrivent bientôt
+            </h3>
+            <p className="mx-auto mt-2.5 max-w-[46ch] text-[13.5px] leading-relaxed text-muted">
+              La sélection se prépare en atelier. Repassez d’ici peu, ou écrivez-nous
+              sur WhatsApp pour être prévenue dès la mise en ligne.
+            </p>
+            <a
+              href={waLink("Bonjour ! Je souhaite être prévenue dès l’arrivée des nouvelles pièces.")}
+              target="_blank"
+              rel="noreferrer"
+              className="group mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-rose px-7 py-3.5 text-[14px] font-bold text-white transition-transform duration-400 ease-soft hover:-translate-y-0.5"
+            >
+              Me prévenir sur WhatsApp
+              <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
+            </a>
+          </Reveal>
+        ) : (
+          <div ref={railRef}>
+            <Carousel label="Sélection de pièces" key={`${tab}-${railSeen}`}>
+              {shown.map((p, i) => (
+                <div key={p.id} className="w-[68vw] sm:w-[42vw] md:w-[30vw] lg:w-[280px] xl:w-[300px]">
+                  <ProductCard
+                    product={p}
+                    onQuickView={setQuick}
+                    delay={railSeen ? i * 70 : undefined}
+                  />
+                </div>
+              ))}
+            </Carousel>
+
+            {/* Le rail ne montre qu'une poignée de pièces : de quoi voir le
+                reste sans revenir chercher la barre du haut. */}
+            <Reveal className="mt-9 flex justify-center">
+              <Link
+                href="/boutique"
+                className="group inline-flex items-center gap-2 rounded-full border-[1.5px] border-line bg-white px-6 py-3 text-[13.5px] font-bold transition-colors duration-300 hover:border-rose hover:text-rose"
+              >
+                Découvrir la boutique
+                <IconArrow className="h-4 w-4 transition-transform duration-300 ease-soft group-hover:translate-x-1" />
+              </Link>
+            </Reveal>
+          </div>
+        )}
       </section>
 
       {/* ==================================================== en mouvement */}
@@ -651,13 +693,13 @@ export function Home({ products }: { products: Product[] }) {
         />
       </div>
 
-      {/* Posé à même la page : ni panneau, ni aplat sombre. Les deux entrées
+      {/* Posé à même la page : ni panneau, ni aplat sombre. Les trois entrées
           sont les seuls objets dessinés, la lecture va droit au numéro. */}
       <Reveal className={`${SHELL} pt-16 text-center md:pt-20`} variant="scale">
         <span className={EYEBROW}>Une question ?</span>
         <h2 className={`${H2} mx-auto mt-2.5 text-balance`}>Nous contacter</h2>
-        {/* Deux entrées plutôt qu'un formulaire : la conversation reprend là
-            où la cliente a déjà l'habitude d'écrire. */}
+        {/* Des comptes plutôt qu'un formulaire : la conversation reprend là
+            où la cliente a déjà l'habitude d'écrire et de regarder. */}
         <div className="mx-auto mt-9 grid max-w-[1020px] gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {CONTACT.map((c) => (
             <a

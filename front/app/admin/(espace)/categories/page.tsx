@@ -9,10 +9,12 @@ import {
   DeleteButton,
   EmptyState,
   Field,
+  GrilleMedias,
   Input,
   Modal,
   PageHeader,
   Pagination,
+  sansAccent,
   SearchField,
   Textarea,
   Toggle,
@@ -26,6 +28,7 @@ import {
   IconPencil,
   IconPlus,
   IconTrash,
+  IconX,
 } from "@/components/admin/icons";
 
 /**
@@ -555,9 +558,10 @@ function ChoixSousCategories({
   );
   const [recherche, setRecherche] = useState("");
 
-  const visibles = proposables.filter((r) =>
-    r.label.toLowerCase().includes(recherche.trim().toLowerCase()),
-  );
+  const visibles = proposables.filter((r) => sansAccent(r.label).includes(sansAccent(recherche)));
+  /* La liste ne défile plus dans un cadre à hauteur fixe : on la parcourt par
+     pages, comme les autres choix du back-office. */
+  const visiblesPage = usePagination(visibles, 6, (r) => r.id);
 
   const basculer = (slug: string) =>
     setChoisies((courant) =>
@@ -585,8 +589,12 @@ function ChoixSousCategories({
   return (
     <Modal open onClose={onClose} title={`Sous-catégories de « ${categorie.label} »`}>
       <div className="flex flex-col gap-4">
-        {proposables.length > 6 && (
-          <SearchField value={recherche} onChange={setRecherche} placeholder="Chercher…" />
+        {proposables.length > 0 && (
+          <SearchField
+            value={recherche}
+            onChange={setRecherche}
+            placeholder="Rechercher une sous-catégorie"
+          />
         )}
 
         {proposables.length === 0 ? (
@@ -594,8 +602,8 @@ function ChoixSousCategories({
             Aucune sous-catégorie.
           </p>
         ) : (
-          <ul className="flex max-h-[46vh] flex-col divide-y divide-[#f4edf0] overflow-auto">
-            {visibles.map((r) => {
+          <ul className="flex flex-col divide-y divide-[#f4edf0]">
+            {visiblesPage.tranche.map((r) => {
               const on = choisies.includes(r.slug);
               const ailleurs = r.parentNoms.filter((n) => n !== categorie.label);
               return (
@@ -631,6 +639,16 @@ function ChoixSousCategories({
             )}
           </ul>
         )}
+
+        <Pagination
+          page={visiblesPage.page}
+          pages={visiblesPage.pages}
+          total={visiblesPage.total}
+          debut={visiblesPage.debut}
+          affiches={visiblesPage.tranche.length}
+          onPage={visiblesPage.setPage}
+          unite="sous-catégories"
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-4">
           <Button variant="contour" onClick={onCreer}>
@@ -671,6 +689,7 @@ function EditeurRayon({
   const [envoiImage, setEnvoiImage] = useState(false);
   const [phototheque, setPhototheque] = useState(false);
   const [rechercheParente, setRechercheParente] = useState("");
+  const [choixParentes, setChoixParentes] = useState(false);
   const fichierRef = useRef<HTMLInputElement>(null);
 
   const maj = (patch: Partial<AdminCategory>) => setBrouillon({ ...brouillon, ...patch });
@@ -682,8 +701,11 @@ function EditeurRayon({
     (r) => r.parentSlugs.length === 0 && r.slug && r.slug !== brouillon.slug,
   );
   const parentesVisibles = parentesPossibles.filter((r) =>
-    r.label.toLocaleLowerCase("fr").includes(rechercheParente.trim().toLocaleLowerCase("fr")),
+    sansAccent(r.label).includes(sansAccent(rechercheParente)),
   );
+  /* Un catalogue mûr compte des dizaines de rayons : on les parcourt par pages
+     plutôt que dans une liste qui déborde du formulaire. */
+  const parentesPage = usePagination(parentesVisibles, 8, (r) => r.id);
 
   const valide =
     brouillon.label.trim().length >= 3 &&
@@ -734,56 +756,25 @@ function EditeurRayon({
                 Aucune catégorie disponible.
               </p>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {brouillon.parentSlugs.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {parentesPossibles
-                      .filter((r) => brouillon.parentSlugs.includes(r.slug))
-                      .map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => basculer(r.slug)}
-                          className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white"
-                          title={`Retirer ${r.label}`}
-                        >
-                          {r.label}
-                          <span aria-hidden="true">×</span>
-                        </button>
-                      ))}
-                  </div>
-                )}
-                <SearchField
-                  value={rechercheParente}
-                  onChange={setRechercheParente}
-                  placeholder="Rechercher une catégorie"
-                />
-                <div className="max-h-36 overflow-y-auto rounded-xl border border-line bg-white p-1.5">
-                  {parentesVisibles.map((r) => {
-                    const on = brouillon.parentSlugs.includes(r.slug);
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => basculer(r.slug)}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-mist"
-                      >
-                        <span
-                          className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${
-                            on ? "border-rose bg-rose text-white" : "border-[#e5d9de] bg-white"
-                          }`}
-                        >
-                          {on && <IconCheck className="h-3 w-3" />}
-                        </span>
-                        <span className="truncate text-[12.5px] font-semibold">{r.label}</span>
-                      </button>
-                    );
-                  })}
-                  {parentesVisibles.length === 0 && (
-                    <p className="px-2.5 py-3 text-center text-[12px] text-muted">Aucun résultat</p>
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {parentesPossibles
+                  .filter((r) => brouillon.parentSlugs.includes(r.slug))
+                  .map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => basculer(r.slug)}
+                      className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white"
+                      title={`Retirer ${r.label}`}
+                    >
+                      {r.label}
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  ))}
+                <Button variant="contour" size="sm" onClick={() => setChoixParentes(true)}>
+                  <IconPlus />
+                  {brouillon.parentSlugs.length > 0 ? "Modifier" : "Choisir"}
+                </Button>
               </div>
             )}
           </div>
@@ -802,46 +793,53 @@ function EditeurRayon({
         <div>
           <span className="mb-2 block text-[12px] font-bold">Visuel</span>
 
+          {/* Mêmes gestes que sur la fiche produit : une vignette qu'on remplit,
+              et la photothèque juste en dessous. */}
           <div className="flex flex-wrap items-center gap-3">
-            <VisuelCategorie
-              src={brouillon.image}
-              alt={brouillon.label || "Aperçu"}
-              className="h-20 w-16 rounded-xl"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                ref={fichierRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => choisirFichier(e.target.files?.[0])}
-              />
-              <Button
-                variant="contour"
-                size="sm"
-                disabled={envoiImage}
-                onClick={() => fichierRef.current?.click()}
+            {brouillon.image && (
+              <div
+                className="group relative aspect-3/4 w-24 overflow-hidden rounded-2xl bg-stone bg-cover bg-center"
+                style={{ backgroundImage: `url(${brouillon.image})` }}
               >
-                {envoiImage ? "Envoi…" : brouillon.image ? "Changer l'image" : "Importer une image"}
-              </Button>
+                <button
+                  type="button"
+                  onClick={() => maj({ image: "" })}
+                  aria-label="Retirer l'image"
+                  className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-ink opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <IconX className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fichierRef.current?.click()}
+              disabled={envoiImage}
+              className="flex aspect-3/4 w-24 flex-col items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-[#e0d3d9] text-muted transition-colors hover:border-rose hover:text-rose disabled:opacity-50"
+            >
+              <IconPlus />
+              <span className="text-[11px] font-semibold">
+                {envoiImage ? "Envoi…" : brouillon.image ? "Remplacer" : "Importer"}
+              </span>
+            </button>
+
+            <div className="flex flex-col items-start gap-1.5">
               <Button variant="contour" size="sm" onClick={() => setPhototheque(true)}>
                 <IconImage />
                 Photothèque
               </Button>
-              {brouillon.image && (
-                <Button variant="ghost" size="sm" onClick={() => maj({ image: "" })}>
-                  <IconTrash />
-                  Retirer
-                </Button>
-              )}
+              <span className="text-[12px] text-muted">JPG ou PNG</span>
             </div>
           </div>
 
-          <Input
-            className="mt-2.5"
-            value={brouillon.image}
-            onChange={(v) => maj({ image: v })}
-            placeholder="…ou collez l'adresse d'une image déjà en ligne"
+          {/* Le champ de fichier natif reste caché : la vignette en tient lieu. */}
+          <input
+            ref={fichierRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => choisirFichier(e.target.files?.[0])}
           />
         </div>
 
@@ -861,28 +859,82 @@ function EditeurRayon({
           </Button>
         </div>
 
-        <Modal open={phototheque} onClose={() => setPhototheque(false)} title="Photothèque">
-          {library.media.length === 0 ? (
-            <p className="text-[13px] text-muted">Photothèque vide.</p>
+        <Modal
+          open={choixParentes}
+          onClose={() => setChoixParentes(false)}
+          title="Catégories parentes"
+        >
+          <div className="mb-4 flex">
+            <SearchField
+              value={rechercheParente}
+              onChange={setRechercheParente}
+              placeholder="Rechercher une catégorie"
+            />
+          </div>
+
+          {parentesVisibles.length === 0 ? (
+            <p className="text-[13px] text-muted">Aucun résultat.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-              {library.media.map((media) => (
-                <button
-                  key={media.id}
-                  type="button"
-                  onClick={() => {
-                    maj({ image: media.src });
-                    setPhototheque(false);
-                  }}
-                  title={media.name}
-                  className={`aspect-3/4 rounded-xl bg-stone bg-cover bg-center ring-offset-2 transition-all hover:ring-2 hover:ring-rose ${
-                    brouillon.image === media.src ? "ring-2 ring-ink" : ""
-                  }`}
-                  style={{ backgroundImage: `url(${media.src})` }}
-                />
-              ))}
+            <div className="rounded-xl border border-line bg-white p-1.5">
+              {parentesPage.tranche.map((r) => {
+                const on = brouillon.parentSlugs.includes(r.slug);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => basculer(r.slug)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-mist"
+                  >
+                    <span
+                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-[1.5px] ${
+                        on ? "border-rose bg-rose text-white" : "border-[#e5d9de] bg-white"
+                      }`}
+                    >
+                      {on && <IconCheck className="h-3 w-3" />}
+                    </span>
+                    <span className="truncate text-[12.5px] font-semibold">{r.label}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
+
+          <Pagination
+            page={parentesPage.page}
+            pages={parentesPage.pages}
+            total={parentesPage.total}
+            debut={parentesPage.debut}
+            affiches={parentesPage.tranche.length}
+            onPage={parentesPage.setPage}
+            unite="catégories"
+          />
+
+          {/* Les cases s'appliquent au fur et à mesure : ce bouton ne valide
+              rien, il referme. Sans lui on ne sait pas qu'on a fini. */}
+          <div className="mt-4 flex items-center justify-end border-t border-line pt-4">
+            <Button variant="rose" onClick={() => setChoixParentes(false)}>
+              <IconCheck />
+              Choisir
+            </Button>
+          </div>
+        </Modal>
+
+        <Modal
+          open={phototheque}
+          onClose={() => setPhototheque(false)}
+          title="Photothèque"
+          wide
+        >
+          <GrilleMedias
+            medias={library.media}
+            estChoisi={(media) => brouillon.image === media.src}
+            onChoisir={(media) => {
+              maj({ image: media.src });
+              setPhototheque(false);
+            }}
+            vide="Photothèque vide."
+          />
         </Modal>
       </div>
     </Modal>

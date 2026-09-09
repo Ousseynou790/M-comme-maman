@@ -118,11 +118,13 @@ export function Catalogue({
             {recherche ? `« ${recherche} »` : "Catalogue"}
           </h1>
           <p className="mt-2 text-[14.5px] text-muted">
-            {recherche || filters.length
-              ? `${list.length} pièce${list.length > 1 ? "s" : ""} ${
-                  recherche ? "pour cette recherche" : "correspondent à votre sélection"
-                }.`
-              : `${produits.length} pièces, toutes photographiées et décrites. Tout tient sur une seule page.`}
+            {produits.length === 0
+              ? "Le catalogue se remplit. Les premières pièces arrivent bientôt."
+              : recherche || filters.length
+                ? `${list.length} pièce${list.length > 1 ? "s" : ""} ${
+                    recherche ? "pour cette recherche" : "correspondent à votre sélection"
+                  }.`
+                : `${produits.length} pièces, toutes photographiées et décrites. Tout tient sur une seule page.`}
           </p>
         </div>
         <button
@@ -205,15 +207,19 @@ export function Catalogue({
 
           {list.length === 0 && (
             <p className="py-16 text-center text-[14.5px] text-muted">
-              Aucune pièce ne répond à cette combinaison. Retirez une pastille pour élargir.
+              {produits.length === 0
+                ? "Aucune pièce en ligne pour le moment — elles seront disponibles bientôt."
+                : "Aucune pièce ne répond à cette combinaison. Retirez une pastille pour élargir."}
             </p>
           )}
 
-          <p className="pt-11 text-center text-[13.5px] text-muted">
-            {recherche || filters.length
-              ? `Fin des résultats. Retirez une pastille pour revoir les ${produits.length} pièces.`
-              : `Vous avez vu les ${produits.length} pièces. Pas de page 2 pour un catalogue de cette taille.`}
-          </p>
+          {produits.length > 0 && (
+            <p className="pt-11 text-center text-[13.5px] text-muted">
+              {recherche || filters.length
+                ? `Fin des résultats. Retirez une pastille pour revoir les ${produits.length} pièces.`
+                : `Vous avez vu les ${produits.length} pièces. Pas de page 2 pour un catalogue de cette taille.`}
+            </p>
+          )}
         </div>
       </div>
 

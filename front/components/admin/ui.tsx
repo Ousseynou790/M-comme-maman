@@ -7,6 +7,7 @@ import type { OrderStatus, ProductStatus } from "@/lib/admin/types";
 import {
   IconArrowLeft,
   IconArrowRight,
+  IconCheck,
   IconSearchAdmin,
   IconTrash,
   IconX,
@@ -509,6 +510,105 @@ export function SearchField({
         className={`${CHAMP} pl-10`}
       />
     </div>
+  );
+}
+
+/**
+ * Pour chercher sans se soucier des accents ni des majuscules.
+ *
+ * « ecru » doit trouver « Écru », et « rose poudre » « Rose poudré » : sans ça
+ * la recherche ne sert qu'à celles qui savent déjà comment c'est écrit.
+ */
+export const sansAccent = (valeur: string) =>
+  valeur
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("fr");
+
+/** Ce qu'il faut d'une image pour l'afficher : la photothèque en donne plus. */
+type Vignette = { id: string; src: string; name: string };
+
+/**
+ * La photothèque en grille, avec recherche et pages.
+ *
+ * Deux formulaires viennent y chercher une image — la fiche produit et le
+ * rayon — et une séance photo en ajoute quinze d'un coup : sans recherche ni
+ * pagination, on finit par dérouler tout le catalogue pour retrouver une robe.
+ * La recherche ignore les accents et la casse.
+ */
+export function GrilleMedias({
+  medias,
+  onChoisir,
+  estChoisi,
+  parPage = 15,
+  vide = "La photothèque est vide.",
+}: {
+  medias: Vignette[];
+  onChoisir: (media: Vignette) => void;
+  /** Coche les images déjà retenues par le formulaire appelant. */
+  estChoisi?: (media: Vignette) => boolean;
+  parPage?: number;
+  vide?: string;
+}) {
+  const [recherche, setRecherche] = useState("");
+
+  const cherche = sansAccent(recherche);
+  const filtres = cherche
+    ? medias.filter((m) => sansAccent(m.name).includes(cherche))
+    : medias;
+  const page = usePagination(filtres, parPage, (m) => m.id);
+
+  if (medias.length === 0) return <p className="text-[13px] text-muted">{vide}</p>;
+
+  return (
+    <>
+      <div className="mb-4 flex">
+        <SearchField
+          value={recherche}
+          onChange={setRecherche}
+          placeholder="Rechercher une photo par son nom…"
+        />
+      </div>
+
+      {filtres.length === 0 ? (
+        <p className="text-[13px] text-muted">Aucune photo ne porte ce nom.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+          {page.tranche.map((media) => (
+            <button
+              key={media.id}
+              type="button"
+              onClick={() => onChoisir(media)}
+              title={media.name}
+              className={`group relative aspect-3/4 overflow-hidden rounded-2xl bg-stone bg-cover bg-center ring-offset-2 transition-all hover:ring-2 hover:ring-rose ${
+                estChoisi?.(media) ? "ring-2 ring-ink" : ""
+              }`}
+              style={{ backgroundImage: `url(${media.src})` }}
+            >
+              <span className="absolute inset-x-0 bottom-0 truncate bg-ink/60 px-2 py-1 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {media.name}
+              </span>
+              {estChoisi?.(media) && (
+                <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-rose text-white">
+                  <IconCheck className="h-3 w-3" />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Pagination
+        page={page.page}
+        pages={page.pages}
+        total={page.total}
+        debut={page.debut}
+        affiches={page.tranche.length}
+        onPage={page.setPage}
+        unite="photos"
+      />
+    </>
   );
 }
 

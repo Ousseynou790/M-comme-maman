@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAdmin } from "@/lib/admin/store";
 import type { AdminColor, SizeValue } from "@/lib/admin/types";
 import {
@@ -34,7 +34,7 @@ export default function Page() {
     deleteColor,
     saveMaterial,
     deleteMaterial,
-    addMedia,
+    televerserMedia,
     removeMedia,
     hydrated,
     enCours,
@@ -45,14 +45,21 @@ export default function Page() {
   const [repere, setRepere] = useState("");
   const [couleur, setCouleur] = useState({ name: "", hex: "#e0417f" });
   const [matiere, setMatiere] = useState("");
-  const [media, setMedia] = useState({ src: "", name: "" });
+  const [envoiMedia, setEnvoiMedia] = useState(false);
+  const [rechercheMedia, setRechercheMedia] = useState("");
+  const fichierRef = useRef<HTMLInputElement>(null);
   const [editionRepere, setEditionRepere] = useState<SizeValue | null>(null);
   const [repereEdite, setRepereEdite] = useState("");
 
   const taillesPage = usePagination(library.sizes, 8, (s) => s.value);
   const couleursPage = usePagination(library.colors, 8, (c) => c.id);
   const matieresPage = usePagination(library.materials, 12, (m) => m.id);
-  const mediasPage = usePagination(library.media, 12, (m) => m.id);
+  /* Même besoin que dans l'éditeur de fiche : passé quelques séances photo, on
+     ne retrouve plus une image en déroulant. */
+  const mediasFiltres = library.media.filter(
+    (m) => !rechercheMedia.trim() || normaliser(m.name).includes(normaliser(rechercheMedia)),
+  );
+  const mediasPage = usePagination(mediasFiltres, 12, (m) => m.id);
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture de la configuration…</p>;
 
@@ -120,15 +127,24 @@ export default function Page() {
     setMatiere("");
   };
 
-  const ajouterMedia = () => {
-    const src = media.src.trim();
-    if (!src) return;
-    if (library.media.some((item) => item.src.trim() === src)) {
-      notify("warning", "Cette image existe déjà dans la photothèque.");
-      return;
+  /**
+   * Importe des images depuis l'ordinateur.
+   *
+   * La photothèque garde les fichiers eux-mêmes : rien à héberger ailleurs, ni
+   * d'adresse à recopier. Plusieurs d'un coup, une séance photo en donne
+   * rarement une seule.
+   */
+  const importerMedias = async (fichiers: FileList | null) => {
+    if (!fichiers?.length) return;
+    setEnvoiMedia(true);
+    let envoyees = 0;
+    for (const fichier of Array.from(fichiers)) {
+      if (await televerserMedia(fichier)) envoyees += 1;
     }
-    addMedia([{ src, name: media.name.trim() || src.split("/").pop() || "visuel" }]);
-    setMedia({ src: "", name: "" });
+    setEnvoiMedia(false);
+    if (fichierRef.current) fichierRef.current.value = "";
+    if (envoyees) notify("success", `${envoyees} image${envoyees > 1 ? "s" : ""} ajoutée${envoyees > 1 ? "s" : ""}.`);
+    else notify("error", "Aucune image n'a pu être envoyée.");
   };
 
   return (
@@ -322,29 +338,44 @@ export default function Page() {
           title="Photothèque"
           sub="Les visuels partagés par les produits et les catégories."
         >
-          <div className="flex flex-wrap items-end gap-2.5">
-            <Field label="Adresse de l'image" className="min-w-[200px] flex-1">
-              <Input
-                value={media.src}
-                onChange={(v) => setMedia((m) => ({ ...m, src: v }))}
-                placeholder="https://…"
-              />
-            </Field>
-            <Field label="Nom" className="min-w-[120px]">
-              <Input
-                value={media.name}
-                onChange={(v) => setMedia((m) => ({ ...m, name: v }))}
-                placeholder="robe-plumetis"
-              />
-            </Field>
-            <Button variant="ink" onClick={ajouterMedia} disabled={!media.src.trim() || enCours}>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Le champ natif reste caché : le bouton en tient lieu. */}
+            <input
+              ref={fichierRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => void importerMedias(e.target.files)}
+            />
+            <Button
+              variant="ink"
+              onClick={() => fichierRef.current?.click()}
+              disabled={envoiMedia || enCours}
+            >
               <IconPlus />
-              Ajouter
+              {envoiMedia ? "Envoi…" : "Importer des images"}
             </Button>
+            <span className="text-[12px] text-muted">
+              JPG ou PNG, plusieurs à la fois
+            </span>
           </div>
 
-          {library.media.length === 0 ? (
-            <p className="mt-4 text-[13px] text-muted">La photothèque est vide.</p>
+          {library.media.length > 0 && (
+            <Input
+              className="mt-3.5"
+              value={rechercheMedia}
+              onChange={setRechercheMedia}
+              placeholder="Rechercher une photo par son nom…"
+            />
+          )}
+
+          {mediasFiltres.length === 0 ? (
+            <p className="mt-4 text-[13px] text-muted">
+              {library.media.length === 0
+                ? "La photothèque est vide."
+                : "Aucune photo ne porte ce nom."}
+            </p>
           ) : (
             <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
               {mediasPage.tranche.map((m) => (

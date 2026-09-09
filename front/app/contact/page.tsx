@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
-import { IconInstagram } from "@/components/icons";
+import { IconArrow, IconInstagram, IconPin, IconTikTok } from "@/components/icons";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CartDrawer } from "@/components/cart-drawer";
-import { INSTAGRAM, INSTAGRAM_URL, waLink } from "@/lib/format";
+import {
+  ADRESSE,
+  INSTAGRAM,
+  INSTAGRAM_URL,
+  MAPS_EMBED,
+  MAPS_URL,
+  TIKTOK,
+  TIKTOK_URL,
+  waLink,
+} from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Nous écrire",
@@ -19,11 +28,9 @@ const FIELDS = [
   { l: "Votre message", v: "Bonjour, je cherche…", span: 2, textarea: true },
 ];
 
-const CARDS = [
-  { t: "Horaires", v: "Lundi au samedi\n9 h – 19 h" },
-  { t: "Retrait sur place", v: "Sacré-Cœur 3, Dakar\nSur rendez-vous uniquement" },
-  { t: "Courriel", v: "mamand202122@gmail.com\nRéponse sous 24 h" },
-];
+/* Le retrait sur place et l'adresse ont leur propre carte, cliquable : elle
+   mène à Google Maps. Ne reste ici que ce qui ne s'ouvre nulle part. */
+const CARDS = [{ t: "Horaires", v: "Lundi au samedi\n9 h – 19 h" }];
 
 export default function Page() {
   return (
@@ -108,6 +115,66 @@ export default function Page() {
                 Beaucoup partent avant même d&apos;être en ligne.
               </p>
             </a>
+
+            {/* TikTok à la place du courriel : la boutique y répond, une boîte
+                mail non. Même carte qu'Instagram, même geste. */}
+            <a
+              href={TIKTOK_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-[20px] border border-line bg-white px-6 py-5.5 transition-colors hover:border-rose"
+            >
+              <div className="flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-[.08em] text-rose">
+                <IconTikTok className="h-4 w-4" />
+                Les pièces en vidéo
+              </div>
+              <div className="mt-2 text-[15px] font-semibold leading-relaxed">@{TIKTOK}</div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+                La coupe et la tombée se voient mieux en mouvement : les nouveautés y sont
+                filmées dès le déballage.
+              </p>
+            </a>
+
+            {/* La localisation du magasin : l'adresse, puis le plan lui-même.
+                Le plan est un <iframe> et non une image — la cliente zoome et
+                fait glisser sans quitter la page. La carte entière ne peut donc
+                pas être un lien : c'est la barre du bas qui ouvre Maps. */}
+            <div className="overflow-hidden rounded-[20px] border border-line bg-white">
+              <div className="px-6 pb-5 pt-5.5">
+                <div className="flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-[.08em] text-rose">
+                  <IconPin className="h-4 w-4" />
+                  Le magasin
+                </div>
+                <div className="mt-2 text-[15px] font-semibold leading-relaxed">{ADRESSE}</div>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+                  Retrait sur place sur rendez-vous : prévenez sur WhatsApp avant de passer, la
+                  pièce est mise de côté.
+                </p>
+              </div>
+
+              {/* `loading="lazy"` : le plan est en bas de colonne, il ne doit
+                  pas retarder l'affichage du formulaire. */}
+              <div className="border-y border-line bg-mist">
+                <iframe
+                  src={MAPS_EMBED}
+                  title={`Plan d'accès — ${ADRESSE}`}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                  className="block h-[210px] w-full border-0"
+                />
+              </div>
+
+              <a
+                href={MAPS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center justify-between gap-2 px-6 py-4 text-[13px] font-bold text-rose transition-colors hover:bg-cream"
+              >
+                Ouvrir dans Google Maps
+                <IconArrow className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+              </a>
+            </div>
 
             {CARDS.map((c) => (
               <div key={c.t} className="rounded-[20px] bg-mist px-6 py-5.5">

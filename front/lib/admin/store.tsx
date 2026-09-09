@@ -65,6 +65,15 @@ export { REFERENCE_DATE } from "./seed";
 export const ADMIN_STORAGE_KEY = "mcm-admin-v1";
 
 /**
+ * La taille des fiches vendues sans déclinaison.
+ *
+ * Une variante porte toujours une taille — c'est elle qui tient le stock et
+ * qui part au panier. Un article qui ne se décline pas en reçoit donc une
+ * seule, « TU », et son stock est celui de la fiche entière.
+ */
+export const TAILLE_UNIQUE = "TU";
+
+/**
  * L'état du back-office, tenu par le serveur.
  *
  * Il n'y a plus rien dans le navigateur : chaque écriture part vers
@@ -216,7 +225,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const [produits, rayons, commandes, clientes, campagnes, tailles, coloris, matieres, medias, reglages] =
       await Promise.all([
         tout<ProduitGestionApi>("/api/gestion/produits/"),
-        envoyer<RayonApi[]>("/api/catalogue/rayons/?tous=1").catch(() => null),
+        // La route publique masque les rayons invisibles : lus par là, ceux
+        // qu'on vient de décocher disparaissaient aussi du back-office, comme
+        // s'ils avaient été supprimés. `/api/gestion/` les rend tous.
+        tout<RayonApi>("/api/gestion/rayons/"),
         tout<CommandeApi>("/api/gestion/commandes/"),
         tout<ClienteApi>("/api/gestion/clientes/"),
         tout<CampagneApi>("/api/gestion/campagnes/"),
@@ -230,7 +242,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         envoyer<ReglagesApi>("/api/gestion/reglages/").catch(() => null),
       ]);
 
-    const categories = (rayons ?? []).map(versCategorie);
+    const categories = contenu(rayons).map(versCategorie);
     const rayonsParId = new Map(categories.map((r) => [Number(r.id), r.slug]));
     setState((courant) => ({
       ...courant,
@@ -364,6 +376,41 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     async (produitId: number, produit: AdminProduct) => {
       const tailles = new Map(state.library.sizes.map((t) => [t.value, Number(t.id)]));
       const coloris = new Map(state.library.colors.map((c) => [c.name, Number(c.id)]));
+
+      /* Une taille ou un coloris saisi depuis la fiche peut ne pas être encore
+         revenu du serveur. Plutôt que de laisser tomber la variante — l'article
+         partait alors sans stock, donc invendable —, on crée ce qui manque. Un
+         refus signifie presque toujours que la valeur existe déjà : on relit
+         plutôt que d'abandonner. */
+      const taillePour = async (valeur: string): Promise<number | null> => {
+        const connue = tailles.get(valeur);
+        if (connue) return connue;
+        const creee = await envoyer<TailleApi>("/api/gestion/tailles/", "POST", {
+          valeur,
+          repere: valeur === TAILLE_UNIQUE ? "Taille unique" : "",
+          ordre: tailles.size,
+        }).catch(() => null);
+        if (creee) tailles.set(creee.valeur, creee.id);
+        else
+          for (const t of (await envoyer<TailleApi[]>("/api/gestion/tailles/").catch(() => null)) ?? [])
+            tailles.set(t.valeur, t.id);
+        return tailles.get(valeur) ?? null;
+      };
+
+      const colorisPour = async (nom: string): Promise<number | null> => {
+        const connu = coloris.get(nom);
+        if (connu) return connu;
+        const cree = await envoyer<ColorisApi>("/api/gestion/coloris/", "POST", {
+          nom,
+          hexa: "#000000",
+        }).catch(() => null);
+        if (cree) coloris.set(cree.nom, cree.id);
+        else
+          for (const c of (await envoyer<ColorisApi[]>("/api/gestion/coloris/").catch(() => null)) ?? [])
+            coloris.set(c.nom, c.id);
+        return coloris.get(nom) ?? null;
+      };
+
       const existantes = contenu(
         await envoyer<Page<{ id: number; taille: number; coloris: number | null; stock: number }>>(
           `/api/gestion/variantes/?produit=${produitId}&page_size=200`,
@@ -375,10 +422,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       >();
 
       for (const varianteProduit of produit.variants) {
-        const taille = tailles.get(varianteProduit.size);
+        const taille = await taillePour(varianteProduit.size);
         if (!taille) continue;
         const colorisId = varianteProduit.color
-          ? (coloris.get(varianteProduit.color) ?? null)
+          ? await colorisPour(varianteProduit.color)
           : null;
         const cle = `${taille}:${colorisId ?? ""}`;
         const suffixe = [varianteProduit.size, varianteProduit.color]

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { formatXOF } from "@/lib/format";
 import { useAdmin } from "@/lib/admin/store";
 import type { HeroSlideConfig } from "@/lib/admin/types";
@@ -12,7 +13,7 @@ import {
   Textarea,
   Toggle,
 } from "@/components/admin/ui";
-import { IconPlus, IconTrash } from "@/components/admin/icons";
+import { IconImage, IconPlus, IconTrash } from "@/components/admin/icons";
 
 const slideVide = (): HeroSlideConfig => ({
   src: "",
@@ -23,7 +24,13 @@ const slideVide = (): HeroSlideConfig => ({
 });
 
 export default function Page() {
-  const { settings, hero, updateSettings, updateHero, hydrated } = useAdmin();
+  const { settings, hero, updateSettings, updateHero, televerserMedia, hydrated } = useAdmin();
+
+  /* Un seul champ de fichier pour toutes les photos de l'arche : celle qu'on
+     remplace est retenue le temps de l'aller-retour. */
+  const fichierRef = useRef<HTMLInputElement>(null);
+  const cible = useRef(0);
+  const [envoi, setEnvoi] = useState<number | null>(null);
 
   if (!hydrated) return <p className="text-[13px] text-muted">Lecture des réglages…</p>;
 
@@ -32,6 +39,22 @@ export default function Page() {
       ...hero,
       slides: hero.slides.map((s, j) => (j === i ? { ...s, ...patch } : s)),
     });
+
+  const importerSlide = async (fichiers: FileList | null) => {
+    const fichier = fichiers?.[0];
+    if (!fichier) return;
+    const i = cible.current;
+    setEnvoi(i);
+    const media = await televerserMedia(fichier, `accueil-${i + 1}`);
+    setEnvoi(null);
+    if (fichierRef.current) fichierRef.current.value = "";
+    if (media) majSlide(i, { src: media.src });
+  };
+
+  const choisirPhoto = (i: number) => {
+    cible.current = i;
+    fichierRef.current?.click();
+  };
 
   const nombre = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 
@@ -168,6 +191,15 @@ export default function Page() {
             hint="Décoché, les trois photos livrées avec le site restent en place."
           />
 
+          {/* Le champ natif reste caché : les boutons en tiennent lieu. */}
+          <input
+            ref={fichierRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void importerSlide(e.target.files)}
+          />
+
           {hero.slides.length === 0 ? (
             <p className="mt-4 text-[13px] text-muted">Aucune photo enregistrée.</p>
           ) : (
@@ -183,9 +215,15 @@ export default function Page() {
                     }
                   />
                   <div className="flex flex-col gap-3">
-                    <Field label="Adresse de l'image">
-                      <Input value={s.src} onChange={(v) => majSlide(i, { src: v })} placeholder="https://…" />
-                    </Field>
+                    <Button
+                      size="sm"
+                      variant="contour"
+                      disabled={envoi !== null}
+                      onClick={() => choisirPhoto(i)}
+                    >
+                      <IconImage />
+                      {envoi === i ? "Envoi…" : s.src ? "Changer la photo" : "Importer une photo"}
+                    </Button>
                     <Field label="Texte de remplacement" hint="Ce que lit une liseuse d'écran.">
                       <Input value={s.alt} onChange={(v) => majSlide(i, { alt: v })} />
                     </Field>

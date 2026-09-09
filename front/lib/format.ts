@@ -22,5 +22,20 @@ export const WHATSAPP = "221762080202";
 export const INSTAGRAM = "mcommaman";
 export const INSTAGRAM_URL = `https://instagram.com/${INSTAGRAM}`;
 
+export const TIKTOK = "mcommaman";
+export const TIKTOK_URL = `https://www.tiktok.com/@${TIKTOK}`;
+
+/* Le magasin.
+   • `MAPS_URL` est le lien court de la fiche : il ouvre l'itinéraire dans
+     l'application du téléphone, pas une page de plus.
+   • `MAPS_EMBED` est le plan encastré dans la page contact. `output=embed`
+     n'exige aucune clé d'API — c'est le seul moyen d'afficher un plan sans
+     ouvrir un compte Google Cloud. Les coordonnées sont celles de la fiche :
+     l'épingle tombe au bon endroit même si Google renomme la rue. */
+export const ADRESSE = "Rue GY-187, Dakar, Sénégal";
+export const MAPS_URL = "https://maps.app.goo.gl/FhvcWxAku2LBCjP67";
+export const MAPS_COORDS = "14.7386622,-17.4621246";
+export const MAPS_EMBED = `https://www.google.com/maps?q=${MAPS_COORDS}&z=16&hl=fr&output=embed`;
+
 export const waLink = (message: string) =>
   `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(message)}`;
