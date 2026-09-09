@@ -280,23 +280,22 @@ class Produit(models.Model):
         """
         Ce qui empêche encore la publication.
 
-        Reprend mot pour mot les cinq conditions affichées dans le back-office.
-        C'est ce contrôle qui manquait quand « Safari enfant » est parti en
-        ligne à 0 F.
+        Trois conditions, les mêmes que celles affichées dans le back-office :
+        de quoi nommer la fiche, la montrer et la facturer. C'est ce contrôle
+        qui manquait quand « Safari enfant » est parti en ligne à 0 F.
+
+        Aucune longueur minimale n'est imposée : un nom court est un nom. La
+        description, la composition et les tailles restent facultatives — une
+        fiche sans variante s'affiche en boutique sans être achetable, ce qui
+        est le comportement voulu pour un article annoncé avant réassort.
         """
         manques = []
-        if len(self.nom.strip()) < 4:
-            manques.append("un nom commercial d'au moins 4 caractères")
+        if not self.nom.strip():
+            manques.append("un nom commercial")
         if not self.pk or not self.photos.exists():
             manques.append("au moins une photo")
         if self.prix <= 0:
             manques.append("un prix supérieur à zéro")
-        if len(self.description.strip()) < 20:
-            manques.append("une description d'au moins 20 caractères")
-        if not self.sku.strip():
-            manques.append("une référence interne")
-        if self.pk and not self.variantes.exists():
-            manques.append("au moins une taille ou option de vente")
         return manques
 
     @property
